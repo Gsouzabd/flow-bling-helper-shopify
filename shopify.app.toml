@@ -3,34 +3,34 @@
 client_id = "51ae29758457cad8d47b5bf4caf80371"
 name = "flow-bling-helper"
 handle = "flow-bling-helper-1"
-application_url = "https://jeremy-exists-display-nj.trycloudflare.com"
+application_url = "https://bookmark-contributing-prefers-barcelona.trycloudflare.com"
 embedded = true
 
 [build]
-include_config_on_deploy = true
 automatically_update_urls_on_dev = true
+include_config_on_deploy = true
 
 [webhooks]
 api_version = "2025-04"
 
   [[webhooks.subscriptions]]
-  topics = [ "app/uninstalled" ]
-  uri = "/webhooks/app/uninstalled"
+  topics = [ "orders/updated" ]
+  uri = "/webhooks/app/orders-updated"
 
   [[webhooks.subscriptions]]
   topics = [ "app/scopes_update" ]
   uri = "/webhooks/app/scopes_update"
 
   [[webhooks.subscriptions]]
-  topics = ["orders/updated"]
-  uri = "/webhooks/app/orders-updated"
-  
+  topics = [ "app/uninstalled" ]
+  uri = "/webhooks/app/uninstalled"
+
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_orders,write_orders,write_customers,read_customers, write_products, read_products"
+scopes = "read_customers,read_orders,read_products,write_customers,write_orders,write_products"
 
 [auth]
-redirect_urls = ["https://jeremy-exists-display-nj.trycloudflare.com/auth/callback", "https://jeremy-exists-display-nj.trycloudflare.com/auth/shopify/callback", "https://jeremy-exists-display-nj.trycloudflare.com/api/auth/callback"]
+redirect_urls = ["https://bookmark-contributing-prefers-barcelona.trycloudflare.com/auth/callback", "https://bookmark-contributing-prefers-barcelona.trycloudflare.com/auth/shopify/callback", "https://bookmark-contributing-prefers-barcelona.trycloudflare.com/api/auth/callback"]
 
 [pos]
 embedded = false
