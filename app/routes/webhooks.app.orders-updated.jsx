@@ -28,37 +28,32 @@ export const action = async ({ request }) => {
 
     const orderId = order.id;
     const financialStatus = order.financial_status;
-      const createdDateRaw = order.created_at.split("T")[0];
-      const createdDate = new Date(createdDateRaw);
+    const createdDateRaw = order.created_at.split("T")[0];
+    const createdDate = new Date(createdDateRaw);
 
-      // Adiciona 1 dia
-      createdDate.setDate(createdDate.getDate() + 1);
+    // ✅ Cópia +1 dia
+    const createdDatePlusOneObj = new Date(createdDate);
+    createdDatePlusOneObj.setDate(createdDatePlusOneObj.getDate() + 1);
+    const createdDatePlusOne = createdDatePlusOneObj.toISOString().split("T")[0];
 
-      // Formata de volta para string "YYYY-MM-DD"
-      const createdDatePlusOne = createdDate.toISOString().split("T")[0];
+    // ✅ Cópia -1 dia
+    const createdDateMinusOneObj = new Date(createdDate);
+    createdDateMinusOneObj.setDate(createdDateMinusOneObj.getDate() - 1);
+    const createdDateMinusOne = createdDateMinusOneObj.toISOString().split("T")[0];
 
     console.log(`orderId: ${orderId}`);
-    console.log(`Criado em: ${createdDate}`);
+    console.log(`Criado em: ${createdDate.toISOString().split("T")[0]}`);
+    console.log(`+1 dia: ${createdDatePlusOne}`);
+    console.log(`-1 dia: ${createdDateMinusOne}`);
     console.log(`Status financeiro: ${financialStatus}`);
+
     // console.log(Object.keys(prisma)); 
 
-    // await saveOrderLogWithRetry({ orderId, financialStatus, createdDate, shop })
-    //   .then((result) => {
-    //     console.log("Pedido salvo no banco:", {
-    //       id: result.id,
-    //       orderId: result.orderId.toString(),
-    //       financialStatus: result.financialStatus,
-    //       createdDate: result.createdDate.toISOString().split("T")[0],
-    //       shop: result.shop,
-    //     });
-    //   })
-    //   .catch((error) => {
-    //     console.error("Erro ao salvar pedido no banco:", error);
-    //   });
 
 
+    if(financialStatus != 'expired') { return new Response(`Pedido ${orderId} nao está expirado.`, { status: 200 }) ;}
     // --- Chamada Bling ---
-    const pedido = await buscarPedidoPorOrderId(shop, createdDatePlusOne, createdDatePlusOne, orderId);
+    const pedido = await buscarPedidoPorOrderId(shop, createdDateMinusOne, createdDatePlusOne, orderId);
     console.log("Pedido filtrado:", pedido);
 
     try {
@@ -66,11 +61,25 @@ export const action = async ({ request }) => {
         "flowdigital.myshopify.com",   // shop
         pedido.id                    // id do pedido no Bling (campo `id`)
       );
+      await saveOrderLogWithRetry({ orderId, financialStatus, createdDate, shop })
+        .then((result) => {
+          console.log("Pedido salvo no banco:", {
+            id: result.id,
+            orderId: result.orderId.toString(),
+            financialStatus: result.financialStatus,
+            createdDate: result.createdDate.toISOString().split("T")[0],
+            shop: result.shop,
+          });
+        })
+        .catch((error) => {
+          console.error("Erro ao salvar pedido no banco:", error);
+        });
       console.log("Pedido cancelado com sucesso:", response);
     } catch (err) {
       console.error("Erro ao cancelar pedido:", err);
     }
-    return new Response("Webhook processado", { status: 200 });
+
+    return new Response(`Pedido ${orderId} cancelado com sucesso na BLING!`, { status: 200 });
   } catch (error) {
     console.error("Erro no webhook:", error);
 

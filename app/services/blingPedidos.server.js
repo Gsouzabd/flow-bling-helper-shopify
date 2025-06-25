@@ -42,12 +42,12 @@ export async function buscarPedidoPorOrderId(shop, dataInicial, dataFinal, order
     return null;
   }
 
-  // const pedido = pedidosData.data.find(
-  //   (p) => p.numeroLoja?.toString() === orderId.toString()
-  // );
   const pedido = pedidosData.data.find(
-    (p) => p.numeroLoja?.toString() === '6170974617821'// ----> MOCK DE DESENVOLVIMENTO
+    (p) => p.numeroLoja?.toString() === orderId.toString()
   );
+  // const pedido = pedidosData.data.find(
+  //   (p) => p.numeroLoja?.toString() === '6169721831645'// ----> MOCK DE DESENVOLVIMENTO
+  // );
 
   return pedido || null;
 }
@@ -57,7 +57,7 @@ export async function buscarPedidoPorOrderId(shop, dataInicial, dataFinal, order
  * Cancela um pedido no Bling, alterando sua situação
  * @param {string} shop - domínio/identificador da loja
  * @param {number|string} idPedidoVenda - ID interno do pedido no Bling (campo `id`)
- * @param {number|string} idSituacao - geralmente `6` para "Cancelado"
+ * @param {number|string} idSituacao - geralmente `12 ` para "Cancelado"
  * @returns {Promise<object>} - resposta da API Bling
  */
 export async function cancelarPedido(shop, idPedidoVenda, idSituacao = 12) {
@@ -74,10 +74,13 @@ export async function cancelarPedido(shop, idPedidoVenda, idSituacao = 12) {
   });
 
   if (!res.ok) {
-    const text = await res.text();
+    const text = await res.text(); // Bling pode retornar string de erro
     throw new Error(`Erro ao cancelar pedido no Bling: ${text}`);
   }
 
-  const data = await res.json();
+  // ✅ Tenta fazer .json() somente se houver corpo
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : { status: "Pedido cancelado com sucesso" };
+
   return data;
 }
