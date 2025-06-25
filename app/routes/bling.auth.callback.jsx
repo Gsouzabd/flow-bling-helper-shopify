@@ -7,6 +7,7 @@ export async function loader({ request }) {
   if (!code) {
     return new Response("Código de autorização não encontrado", { status: 400 });
   }
+  console.log('code', code)
 
   const clientId = process.env.BLING_CLIENT_ID;
   const clientSecret = process.env.BLING_CLIENT_SECRET;
@@ -30,6 +31,8 @@ export async function loader({ request }) {
   if (!tokenResponse.ok) {
     console.error("Erro ao obter token do Bling:", tokenData);
     return new Response("Erro ao obter token do Bling", { status: 500 });
+  }else{
+    console.log('tudo ok com o token')
   }
 
   // Suponha que você tenha o shop no contexto ou sessão

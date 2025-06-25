@@ -41,3 +41,13 @@ model BlingToken {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
+
+
+model OrderLog {
+  id              Int      @id @default(autoincrement())
+  orderId         BigInt   // pode ser BigInt pois o Shopify usa IDs longos
+  financialStatus String
+  createdDate     DateTime
+  shop            String?  // opcional: se quiser rastrear a loja
+  createdAt       DateTime @default(now())
+}

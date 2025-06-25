@@ -1,10 +1,15 @@
 import { authenticate } from "../shopify.server";
+import { prisma } from "../../db/prisma.server";  // caminho correto para seu prisma.client
+
 import { getValidBlingToken } from "../../db/blingToken.server";
+import { saveOrderLog, saveOrderLogWithRetry } from "../../db/orderLog.server";
+import { buscarPedidosPorData, buscarPedidoPorOrderId, cancelarPedido } from "../services/blingPedidos.server";
 
 export const action = async ({ request }) => {
   try {
     // Leia o corpo como texto
     const bodyText = await request.text();
+    const shop = request.headers.get("x-shopify-shop-domain");
 
     // Valide o webhook
     await authenticate.webhook(
@@ -15,44 +20,56 @@ export const action = async ({ request }) => {
       })
     );
 
-    // Parse do payload JSON
-    const payload = JSON.parse(bodyText);
+    // Parse do order JSON
+    const order = JSON.parse(bodyText);
 
     console.log("Webhook validado ✅");
-    console.log("Payload:", payload);
+    // console.log("order:", order);
 
-    // Aqui você verifica o financial_status do pedido
-    const financialStatus = payload.financial_status;
+    const orderId = order.id;
+    const financialStatus = order.financial_status;
+      const createdDateRaw = order.created_at.split("T")[0];
+      const createdDate = new Date(createdDateRaw);
 
-    if (financialStatus === "expired") {
-      console.log("Pedido com pagamento expirado detected!");
-    } else {
-      console.log(`Status financeiro: ${financialStatus}`);
+      // Adiciona 1 dia
+      createdDate.setDate(createdDate.getDate() + 1);
+
+      // Formata de volta para string "YYYY-MM-DD"
+      const createdDatePlusOne = createdDate.toISOString().split("T")[0];
+
+    console.log(`orderId: ${orderId}`);
+    console.log(`Criado em: ${createdDate}`);
+    console.log(`Status financeiro: ${financialStatus}`);
+    // console.log(Object.keys(prisma)); 
+
+    // await saveOrderLogWithRetry({ orderId, financialStatus, createdDate, shop })
+    //   .then((result) => {
+    //     console.log("Pedido salvo no banco:", {
+    //       id: result.id,
+    //       orderId: result.orderId.toString(),
+    //       financialStatus: result.financialStatus,
+    //       createdDate: result.createdDate.toISOString().split("T")[0],
+    //       shop: result.shop,
+    //     });
+    //   })
+    //   .catch((error) => {
+    //     console.error("Erro ao salvar pedido no banco:", error);
+    //   });
+
+
+    // --- Chamada Bling ---
+    const pedido = await buscarPedidoPorOrderId(shop, createdDatePlusOne, createdDatePlusOne, orderId);
+    console.log("Pedido filtrado:", pedido);
+
+    try {
+      const response = await cancelarPedido(
+        "flowdigital.myshopify.com",   // shop
+        pedido.id                    // id do pedido no Bling (campo `id`)
+      );
+      console.log("Pedido cancelado com sucesso:", response);
+    } catch (err) {
+      console.error("Erro ao cancelar pedido:", err);
     }
-
-    // --- Chamada Bling com refresh automático ---
-
-    // Defina seu shop (exemplo hardcoded, adapte conforme seu contexto)
-    const shop = "flowdigital.myshopify.com";
-
-    // Busca token válido, renova se necessário
-    const accessToken = await getValidBlingToken(shop);
-
-    console.log("Token Bling válido para uso:", accessToken);
-
-    const blingResponse = await fetch("https://www.bling.com.br/Api/v3/pedidos/vendas", {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
-
-    // if (!blingResponse.ok) {
-    //   console.error("Erro ao chamar API Bling:", await blingResponse.text());
-    // } else {
-    //   const blingData = await blingResponse.json();
-    //   console.log("Resposta da API Bling:", blingData);
-    // }
-
     return new Response("Webhook processado", { status: 200 });
   } catch (error) {
     console.error("Erro no webhook:", error);
