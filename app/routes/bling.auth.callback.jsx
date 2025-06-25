@@ -1,3 +1,5 @@
+import { saveBlingToken, getBlingToken } from "../../db/blingToken.server";
+
 export async function loader({ request }) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
@@ -6,12 +8,10 @@ export async function loader({ request }) {
     return new Response("Código de autorização não encontrado", { status: 400 });
   }
 
-  // Monta o header Authorization Basic
   const clientId = process.env.BLING_CLIENT_ID;
   const clientSecret = process.env.BLING_CLIENT_SECRET;
   const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
 
-  // Requisição para trocar o code pelo access_token
   const tokenResponse = await fetch("https://www.bling.com.br/Api/v3/oauth/token", {
     method: "POST",
     headers: {
@@ -32,5 +32,17 @@ export async function loader({ request }) {
     return new Response("Erro ao obter token do Bling", { status: 500 });
   }
 
-  console.log('token:', tokenData)
+  // Suponha que você tenha o shop no contexto ou sessão
+  const shop = "flowdigital.myshopify.com";
+
+  await saveBlingToken({
+    shop,
+    accessToken: tokenData.access_token,
+    refreshToken: tokenData.refresh_token,
+    expiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
+  });
+
+
+  return null;
+
 }

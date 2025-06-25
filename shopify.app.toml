@@ -3,7 +3,7 @@
 client_id = "51ae29758457cad8d47b5bf4caf80371"
 name = "flow-bling-helper"
 handle = "flow-bling-helper-1"
-application_url = "https://bookmark-contributing-prefers-barcelona.trycloudflare.com"
+application_url = "https://ecuador-humor-fuzzy-bound.trycloudflare.com"
 embedded = true
 
 [build]
@@ -30,7 +30,7 @@ api_version = "2025-04"
 scopes = "read_customers,read_orders,read_products,write_customers,write_orders,write_products"
 
 [auth]
-redirect_urls = ["https://bookmark-contributing-prefers-barcelona.trycloudflare.com/auth/callback", "https://bookmark-contributing-prefers-barcelona.trycloudflare.com/auth/shopify/callback", "https://bookmark-contributing-prefers-barcelona.trycloudflare.com/api/auth/callback"]
+redirect_urls = ["https://ecuador-humor-fuzzy-bound.trycloudflare.com/auth/callback", "https://ecuador-humor-fuzzy-bound.trycloudflare.com/auth/shopify/callback", "https://ecuador-humor-fuzzy-bound.trycloudflare.com/api/auth/callback"]
 
 [pos]
 embedded = false
