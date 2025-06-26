@@ -3,7 +3,7 @@ import { prisma } from "../../db/prisma.server";  // caminho correto para seu pr
 
 import { getValidBlingToken } from "../../db/blingToken.server";
 import { saveOrderLog, saveOrderLogWithRetry } from "../../db/orderLog.server";
-import { buscarPedidosPorData, buscarPedidoPorOrderId, cancelarPedido } from "../services/blingPedidos.server";
+import { atualizarObservacaoPedido, buscarIdPedido, buscarPedidoCompletoPorId, cancelarPedido } from "../services/blingPedidos.server";
 
 export const action = async ({ request }) => {
   try {
@@ -24,9 +24,10 @@ export const action = async ({ request }) => {
     const order = JSON.parse(bodyText);
 
     console.log("Webhook validado ✅");
-    // console.log("order:", order);
+    console.log("order:", order);
 
     const orderId = order.id;
+    const shopifyId = order.name ?? order.order_number;
     const financialStatus = order.financial_status;
     const createdDateRaw = order.created_at.split("T")[0];
     const createdDate = new Date(createdDateRaw);
@@ -51,33 +52,60 @@ export const action = async ({ request }) => {
 
 
 
-    if(financialStatus != 'expired') { return new Response(`Pedido ${orderId} nao está expirado.`, { status: 200 }) ;}
     // --- Chamada Bling ---
-    const pedido = await buscarPedidoPorOrderId(shop, createdDateMinusOne, createdDatePlusOne, orderId);
+    const pedido = await buscarIdPedido(shop, createdDateMinusOne, createdDatePlusOne, orderId);
     console.log("Pedido filtrado:", pedido);
 
-    try {
-      const response = await cancelarPedido(
-        "flowdigital.myshopify.com",   // shop
-        pedido.id                    // id do pedido no Bling (campo `id`)
-      );
-      await saveOrderLogWithRetry({ orderId, financialStatus, createdDate, shop })
-        .then((result) => {
-          console.log("Pedido salvo no banco:", {
-            id: result.id,
-            orderId: result.orderId.toString(),
-            financialStatus: result.financialStatus,
-            createdDate: result.createdDate.toISOString().split("T")[0],
-            shop: result.shop,
-          });
-        })
-        .catch((error) => {
-          console.error("Erro ao salvar pedido no banco:", error);
-        });
-      console.log("Pedido cancelado com sucesso:", response);
-    } catch (err) {
-      console.error("Erro ao cancelar pedido:", err);
+    // Cancela pedido expirado
+    if(financialStatus == 'expired') {
+      try {
+        const response = await cancelarPedido(
+          shop,       //shop
+          pedido.id  // id do pedido no Bling (campo `id`)
+        );
+        console.log("Pedido cancelado com sucesso:", response);
+      } catch (err) {
+        console.error("Erro ao CANCELAR pedido:", err);
+      }
     }
+
+
+    const pedidoCompleto = await buscarPedidoCompletoPorId(shop, pedido.id);
+    console.log('pedidoCompleto',pedidoCompleto)
+    // Atualizar Observação
+    try {
+      const response = await atualizarObservacaoPedido(
+        shop,   //shop
+        pedidoCompleto, // Objeto do Pedido bling
+        `Referência na Loja: ${shopifyId} \n Nº Pedido Loja: ${orderId}`
+      );
+      
+      console.log("Pedido Atualizado com sucesso:", response);
+    } catch (err) {
+      console.error("Erro ao adicionar OBSERVAÇÃO no pedido:", err);
+    }
+
+
+  const descriptionOperation =
+    financialStatus === "expired"
+      ? "Pedido cancelado automaticamente por expiração"
+      : "Observação atualizada manualmente";
+    // Salva o log do pedido no banco
+    await saveOrderLogWithRetry({ orderId, financialStatus, createdDate, shop, descriptionOperation })
+      .then((result) => {
+        console.log("Pedido salvo no banco:", {
+          id: result.id,
+          orderId: result.orderId.toString(),
+          financialStatus: result.financialStatus,
+          createdDate: result.createdDate.toISOString().split("T")[0],
+          shop: result.shop,
+          description : result.descriptionOperation
+        });
+      })
+      .catch((error) => {
+        console.error("Erro ao salvar pedido no banco:", error);
+      });
+
 
     return new Response(`Pedido ${orderId} cancelado com sucesso na BLING!`, { status: 200 });
   } catch (error) {

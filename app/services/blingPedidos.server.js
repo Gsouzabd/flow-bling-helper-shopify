@@ -35,7 +35,7 @@ export async function buscarPedidosPorData(shop, dataInicial, dataFinal) {
  * @param {string|number} orderId - ID da Shopify (deve ser comparado com numeroLoja)
  * @returns {Promise<object|null>}
  */
-export async function buscarPedidoPorOrderId(shop, dataInicial, dataFinal, orderId) {
+export async function buscarIdPedido(shop, dataInicial, dataFinal, orderId) {
   const pedidosData = await buscarPedidosPorData(shop, dataInicial, dataFinal);
 
   if (!Array.isArray(pedidosData?.data)) {
@@ -46,10 +46,36 @@ export async function buscarPedidoPorOrderId(shop, dataInicial, dataFinal, order
     (p) => p.numeroLoja?.toString() === orderId.toString()
   );
   // const pedido = pedidosData.data.find(
-  //   (p) => p.numeroLoja?.toString() === '6169721831645'// ----> MOCK DE DESENVOLVIMENTO
+  //   (p) => p.numeroLoja?.toString() === '6171121418461'// ----> MOCK DE DESENVOLVIMENTO
   // );
 
+  console.log(pedido)
+
   return pedido || null;
+}
+
+
+/**
+ * Busca um pedido específico pelo `numeroLoja` (orderId da Shopify) dentro do intervalo de datas
+ * @param {string} shop
+ * @param {string|number} idPedido - ID da Bling 
+ * @returns {Promise<object|null>}
+ */
+export async function buscarPedidoCompletoPorId(shop, idPedido) {
+  const token = await getValidBlingToken(shop);
+  const url = `https://bling.com.br/Api/v3/pedidos/vendas/${idPedido}`;
+
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Erro ao buscar pedido completo: ${text}`);
+  }
+
+  const json = await res.json();
+  return json.data // estrutura típica da API Bling
 }
 
 
@@ -83,4 +109,34 @@ export async function cancelarPedido(shop, idPedidoVenda, idSituacao = 12) {
   const data = text ? JSON.parse(text) : { status: "Pedido cancelado com sucesso" };
 
   return data;
+}
+
+/**
+ * Adiciona ou atualiza a observação de um pedido no Bling
+ * @param {string} shop - domínio/identificador da loja
+ * @param {number|string} idPedidoVenda - ID interno do pedido no Bling (campo `id`)
+ * @param {string} observacao - texto a ser inserido no campo "observacoes"
+ * @returns {Promise<object>} - resposta da API Bling
+ */
+export async function atualizarObservacaoPedido(shop, pedidoCompleto, novaObservacao) {
+  const token = await getValidBlingToken(shop);
+
+  // Atualiza o campo observacoes concatenando o novo texto
+  pedidoCompleto.observacoes = novaObservacao;
+
+  const res = await fetch(`https://bling.com.br/Api/v3/pedidos/vendas/${pedidoCompleto.id}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(pedidoCompleto),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Erro ao atualizar pedido: ${text}`);
+  }
+
+  return await res.json();
 }

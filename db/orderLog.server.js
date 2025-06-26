@@ -1,12 +1,13 @@
 import { prisma } from "./prisma.server";
 
-export async function saveOrderLog({ orderId, financialStatus, createdDate, shop }) {
+export async function saveOrderLog({ orderId, financialStatus, createdDate, shop, descriptionOperation }) {
   return prisma.orderLog.create({
     data: {
-      orderId: BigInt(orderId),
-      financialStatus,
-      createdDate: new Date(createdDate),
-      shop,
+      orderId: orderId,
+      financialStatus: financialStatus,
+      createdDate: createdDate,
+      shop: shop,
+      descriptionOperation: descriptionOperation, // 👈 aqui precisa estar presente
     },
   });
 }

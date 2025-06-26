@@ -3,7 +3,7 @@
 client_id = "51ae29758457cad8d47b5bf4caf80371"
 name = "flow-bling-helper"
 handle = "flow-bling-helper-1"
-application_url = "https://frequent-conferencing-subscriber-cork.trycloudflare.com"
+application_url = "https://performer-cooler-lighter-reserved.trycloudflare.com"
 embedded = true
 
 [build]
@@ -30,7 +30,7 @@ api_version = "2025-04"
 scopes = "read_customers,read_orders,read_products,write_customers,write_orders,write_products"
 
 [auth]
-redirect_urls = ["https://frequent-conferencing-subscriber-cork.trycloudflare.com/auth/callback", "https://frequent-conferencing-subscriber-cork.trycloudflare.com/auth/shopify/callback", "https://frequent-conferencing-subscriber-cork.trycloudflare.com/api/auth/callback"]
+redirect_urls = ["https://performer-cooler-lighter-reserved.trycloudflare.com/auth/callback", "https://performer-cooler-lighter-reserved.trycloudflare.com/auth/shopify/callback", "https://performer-cooler-lighter-reserved.trycloudflare.com/api/auth/callback"]
 
 [pos]
 embedded = false

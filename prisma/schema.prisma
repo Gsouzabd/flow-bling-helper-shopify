@@ -9,10 +9,9 @@ generator client {
 // enough when changing adapters.
 // See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
 datasource db {
-  provider = "sqlite"
-  url      = "file:dev.sqlite"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
-
 model Session {
   id            String    @id
   shop          String
@@ -42,12 +41,12 @@ model BlingToken {
   updatedAt    DateTime @updatedAt
 }
 
-
 model OrderLog {
-  id              Int      @id @default(autoincrement())
-  orderId         BigInt   // pode ser BigInt pois o Shopify usa IDs longos
-  financialStatus String
-  createdDate     DateTime
-  shop            String?  // opcional: se quiser rastrear a loja
-  createdAt       DateTime @default(now())
+  id                   Int      @id @default(autoincrement())
+  orderId              BigInt
+  financialStatus      String
+  createdDate          DateTime
+  shop                 String?
+  descriptionOperation String?
+  createdAt            DateTime @default(now()) // ✅ novo campo
 }

@@ -1,16 +1,23 @@
 import { redirect } from "@remix-run/node";
 import { Form, useLoaderData } from "@remix-run/react";
 import { login } from "../../shopify.server";
+import { createClient } from "../../utils/supabase.server"; // ✅ importar Supabase
 import styles from "./styles.module.css";
 
 export const loader = async ({ request }) => {
   const url = new URL(request.url);
 
+  // Redirecionamento padrão do app da Shopify
   if (url.searchParams.get("shop")) {
     throw redirect(`/app?${url.searchParams.toString()}`);
   }
 
+  const supabase = createClient(request);
+  const { data: user, error } = await supabase.auth.getUser();
+
+  return { user };
   return { showForm: Boolean(login) };
+
 };
 
 export default function App() {
