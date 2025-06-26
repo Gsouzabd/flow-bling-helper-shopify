@@ -20,11 +20,10 @@ primary_region = 'gru'
 [http_service]
   internal_port = 3000
   force_https = true
-  auto_stop_machines = 'never'
+  auto_stop_machines = "ignore"
   auto_start_machines = true
   min_machines_running = 1
   processes = ['app']
-
 
 [[vm]]
   memory = '1gb'
