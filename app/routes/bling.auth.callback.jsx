@@ -1,4 +1,4 @@
-import { saveBlingToken, getBlingToken } from "../../db/blingToken.server";
+import { saveBlingToken } from "../../db/blingToken.server";
 
 export async function loader({ request }) {
   const url = new URL(request.url);
@@ -36,7 +36,7 @@ export async function loader({ request }) {
   }
 
   // Suponha que você tenha o shop no contexto ou sessão
-  const shop = "flowdigital.myshopify.com";
+  const shop = "woodbullloja.myshopify.com";
 
   await saveBlingToken({
     shop,
@@ -46,6 +46,6 @@ export async function loader({ request }) {
   });
 
 
-  return null;
+  return new Response(null, { status: 204 }); // No Content, ou redirecione se quiser
 
 }

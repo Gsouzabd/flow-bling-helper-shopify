@@ -1,8 +1,5 @@
 import { authenticate } from "../shopify.server";
-import { prisma } from "../../db/prisma.server";  // caminho correto para seu prisma.client
-
-import { getValidBlingToken } from "../../db/blingToken.server";
-import { saveOrderLog, saveOrderLogWithRetry } from "../../db/orderLog.server";
+import { saveOrderLogWithRetry } from "../../db/orderLog.server";
 import { atualizarObservacaoPedido, buscarIdPedido, buscarPedidoCompletoPorId, cancelarPedido } from "../services/blingPedidos.server";
 
 export const action = async ({ request }) => {
@@ -29,67 +26,66 @@ export const action = async ({ request }) => {
     const orderId = order.id;
     const shopifyId = order.name ?? order.order_number;
     const financialStatus = order.financial_status;
+    const createdAt = new Date(order.created_at); // Data de criação do pedido
+    const currentDate = new Date(); // Data atual
+
+    // Calcular a diferença de tempo em horas
+    const timeDiffMs = currentDate - createdAt;
+    const timeDiffHours = timeDiffMs / (1000 * 60 * 60); // Converte para horas
+    const isPixExpired = financialStatus === 'pending' && timeDiffHours > 24; // Expira após 24 horas
+
+    console.log(`orderId: ${orderId}`);
+    console.log(`Criado em: ${createdAt.toISOString()}`);
+    console.log(`Tempo decorrido (horas): ${timeDiffHours.toFixed(2)}`);
+    console.log(`Status financeiro: ${financialStatus}`);
+    console.log(`PIX expirado: ${isPixExpired}`);
+
+    // --- Chamada Bling ---
     const createdDateRaw = order.created_at.split("T")[0];
     const createdDate = new Date(createdDateRaw);
 
-    // ✅ Cópia +1 dia
+    // Cópia +1 dia
     const createdDatePlusOneObj = new Date(createdDate);
     createdDatePlusOneObj.setDate(createdDatePlusOneObj.getDate() + 1);
     const createdDatePlusOne = createdDatePlusOneObj.toISOString().split("T")[0];
 
-    // ✅ Cópia -1 dia
+    // Cópia -1 dia
     const createdDateMinusOneObj = new Date(createdDate);
     createdDateMinusOneObj.setDate(createdDateMinusOneObj.getDate() - 1);
     const createdDateMinusOne = createdDateMinusOneObj.toISOString().split("T")[0];
 
-    console.log(`orderId: ${orderId}`);
-    console.log(`Criado em: ${createdDate.toISOString().split("T")[0]}`);
-    console.log(`+1 dia: ${createdDatePlusOne}`);
-    console.log(`-1 dia: ${createdDateMinusOne}`);
-    console.log(`Status financeiro: ${financialStatus}`);
-
-    // console.log(Object.keys(prisma)); 
-
-
-
-    // --- Chamada Bling ---
     const pedido = await buscarIdPedido(shop, createdDateMinusOne, createdDatePlusOne, orderId);
     console.log("Pedido filtrado:", pedido);
 
     // Cancela pedido expirado
-    if(financialStatus == 'expired') {
+    if (isPixExpired) {
       try {
-        const response = await cancelarPedido(
-          shop,       //shop
-          pedido.id  // id do pedido no Bling (campo `id`)
-        );
+        const response = await cancelarPedido(shop, pedido.id);
         console.log("Pedido cancelado com sucesso:", response);
       } catch (err) {
         console.error("Erro ao CANCELAR pedido:", err);
       }
     }
 
-
     const pedidoCompleto = await buscarPedidoCompletoPorId(shop, pedido.id);
-    console.log('pedidoCompleto',pedidoCompleto)
+    console.log('pedidoCompleto', pedidoCompleto);
+
     // Atualizar Observação
     try {
       const response = await atualizarObservacaoPedido(
-        shop,   //shop
-        pedidoCompleto, // Objeto do Pedido bling
+        shop,
+        pedidoCompleto,
         `Referência na Loja: ${shopifyId} \n Nº Pedido Loja: ${orderId}`
       );
-      
       console.log("Pedido Atualizado com sucesso:", response);
     } catch (err) {
       console.error("Erro ao adicionar OBSERVAÇÃO no pedido:", err);
     }
 
-
-  const descriptionOperation =
-    financialStatus === "expired"
-      ? "Pedido cancelado automaticamente por expiração"
+    const descriptionOperation = isPixExpired
+      ? "Pedido cancelado automaticamente por expiração do PIX"
       : "Observação atualizada manualmente";
+
     // Salva o log do pedido no banco
     await saveOrderLogWithRetry({ orderId, financialStatus, createdDate, shop, descriptionOperation })
       .then((result) => {
@@ -99,15 +95,14 @@ export const action = async ({ request }) => {
           financialStatus: result.financialStatus,
           createdDate: result.createdDate.toISOString().split("T")[0],
           shop: result.shop,
-          description : result.descriptionOperation
+          description: result.descriptionOperation,
         });
       })
       .catch((error) => {
         console.error("Erro ao salvar pedido no banco:", error);
       });
 
-
-    return new Response(`Pedido ${orderId} cancelado com sucesso na BLING!`, { status: 200 });
+    return new Response(`Pedido ${orderId} processado com sucesso!`, { status: 200 });
   } catch (error) {
     console.error("Erro no webhook:", error);
 
