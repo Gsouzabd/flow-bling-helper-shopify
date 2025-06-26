@@ -56,7 +56,9 @@ export const action = async ({ request }) => {
 
     const pedido = await buscarIdPedido(shop, createdDateMinusOne, createdDatePlusOne, orderId);
     console.log("Pedido filtrado:", pedido);
-
+      if (pedido === undefined || pedido === null) {
+        return new Response("Pedido não encontrado", { status: 404 });
+      }
     // Cancela pedido expirado
     if (isPixExpired) {
       try {
