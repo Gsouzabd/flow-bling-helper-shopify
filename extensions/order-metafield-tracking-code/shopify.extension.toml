@@ -1,0 +1,10 @@
+[[extensions]]
+name = "Order Metafield Tracking Code"
+handle = "order-metafield-tracking-code"
+type = "ui_extension"
+api_version = "2025-04"
+
+
+  [[extensions.targeting]]
+  target = "admin.order-details.block.render"
+  module = "./src/BlockExtension.jsx"

@@ -1,328 +1,208 @@
-import { useEffect } from "react";
-import { useFetcher } from "@remix-run/react";
+import React from "react";
+
+import { useLoaderData, useNavigate, useSearchParams } from "@remix-run/react";
 import {
   Page,
   Layout,
-  Text,
   Card,
+  Text,
+  IndexTable,
+  useIndexResourceState,
+  Badge,
+  TextField,
   Button,
-  BlockStack,
-  Box,
-  List,
-  Link,
-  InlineStack,
+  Pagination,
 } from "@shopify/polaris";
-import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
+
 import { authenticate } from "../shopify.server";
+import { prisma } from "../../db/prisma.server";
 
 export const loader = async ({ request }) => {
   await authenticate.admin(request);
 
-  return null;
-};
+  const url = new URL(request.url);
+  const searchOrderId = url.searchParams.get("orderId") || "";
+  const page = parseInt(url.searchParams.get("page") || "1", 10);
+  const pageSize = 10;
+  const skip = (page - 1) * pageSize;
 
-export const action = async ({ request }) => {
-  const { admin } = await authenticate.admin(request);
-  const color = ["Red", "Orange", "Yellow", "Green"][
-    Math.floor(Math.random() * 4)
-  ];
-  const response = await admin.graphql(
-    `#graphql
-      mutation populateProduct($product: ProductCreateInput!) {
-        productCreate(product: $product) {
-          product {
-            id
-            title
-            handle
-            status
-            variants(first: 10) {
-              edges {
-                node {
-                  id
-                  price
-                  barcode
-                  createdAt
-                }
-              }
-            }
-          }
-        }
-      }`,
-    {
-      variables: {
-        product: {
-          title: `${color} Snowboard`,
-        },
-      },
-    },
-  );
-  const responseJson = await response.json();
-  const product = responseJson.data.productCreate.product;
-  const variantId = product.variants.edges[0].node.id;
-  const variantResponse = await admin.graphql(
-    `#graphql
-    mutation shopifyRemixTemplateUpdateVariant($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-      productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-        productVariants {
-          id
-          price
-          barcode
-          createdAt
-        }
+  const where = searchOrderId
+    ? {
+        orderId: BigInt(searchOrderId),  // Prisma usa BigInt para orderId no seu schema
       }
-    }`,
-    {
-      variables: {
-        productId: product.id,
-        variants: [{ id: variantId, price: "100.00" }],
-      },
-    },
-  );
-  const variantResponseJson = await variantResponse.json();
+    : {};
 
-  return {
-    product: responseJson.data.productCreate.product,
-    variant: variantResponseJson.data.productVariantsBulkUpdate.productVariants,
-  };
+  // Consulta com filtro e paginação
+  const [totalCount, rawLogs] = await Promise.all([
+    prisma.orderLog.count({ where }),
+    prisma.orderLog.findMany({
+      where,
+      orderBy: { createdDate: "desc" },
+      skip,
+      take: pageSize,
+    }),
+  ]);
+
+  const logs = rawLogs.map((log) => ({
+    ...log,
+    orderId: log.orderId.toString(),
+  }));
+
+  return { logs, totalCount, page, pageSize, searchOrderId };
 };
+
+
+
 
 export default function Index() {
-  const fetcher = useFetcher();
-  const shopify = useAppBridge();
-  const isLoading =
-    ["loading", "submitting"].includes(fetcher.state) &&
-    fetcher.formMethod === "POST";
-  const productId = fetcher.data?.product?.id.replace(
-    "gid://shopify/Product/",
-    "",
-  );
+  const { logs, totalCount, page, pageSize, searchOrderId } = useLoaderData();
+  const { selectedResources, allResourcesSelected, handleSelectionChange } =
+    useIndexResourceState(logs);
 
-  useEffect(() => {
-    if (productId) {
-      shopify.toast.show("Product created");
-    }
-  }, [productId, shopify]);
-  const generateProduct = () => fetcher.submit({}, { method: "POST" });
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  // Estado local para input de busca
+  const [orderIdInput, setOrderIdInput] = React.useState(searchOrderId);
+
+  // Função para submeter busca
+  const handleSearchSubmit = () => {
+    const params = new URLSearchParams();
+    if (orderIdInput) params.set("orderId", orderIdInput);
+    // Sempre volta pra página 1 ao buscar
+    params.set("page", "1");
+    navigate(`?${params.toString()}`);
+  };
+
+  // Função para mudar página
+  const handlePageChange = (newPage) => {
+    const params = new URLSearchParams(searchParams);
+    params.set("page", newPage);
+    navigate(`?${params.toString()}`);
+  };
+
+  const resourceName = { singular: "log", plural: "logs" };
 
   return (
-    <Page>
-      <TitleBar title="Remix app template">
-        <button variant="primary" onClick={generateProduct}>
-          Generate a product
-        </button>
-      </TitleBar>
-      <BlockStack gap="500">
-        <Layout>
-          <Layout.Section>
-            <Card>
-              <BlockStack gap="500">
-                <BlockStack gap="200">
-                  <Text as="h2" variant="headingMd">
-                    Congrats on creating a new Shopify app 🎉
-                  </Text>
-                  <Text variant="bodyMd" as="p">
-                    This embedded app template uses{" "}
-                    <Link
-                      url="https://shopify.dev/docs/apps/tools/app-bridge"
-                      target="_blank"
-                      removeUnderline
+    <Page title="Flow Bling Helper">
+      <Layout>
+        {/* Descrição do app */}
+        <Layout.Section>
+          <Card title="Sobre o Flow Bling Helper" sectioned>
+            <Text as="p" variant="bodyMd">
+              O Flow Bling Helper é um app de integração inteligente entre Shopify e Bling.
+              Ele automatiza o monitoramento de pedidos, identifica pagamentos via expirados
+              e realiza cancelamentos automáticos no Bling. Além disso, adiciona observações
+              personalizadas nos pedidos e registra logs completos no banco de dados para rastreabilidade.
+            </Text>
+          </Card>
+        </Layout.Section>
+       
+
+        {/* Tabela */}
+        <Layout.Section>
+          <Text as="h2" variant="headingMd" alignment="start">
+            Log de Pedidos processados
+          </Text>
+          <Card title="Últimos pedidos processados" sectioned>
+             {/* Busca */}
+            <div style={{ display: "flex", gap: 8, alignItems: "flex-end", marginBottom: 10 }}>
+              <TextField
+                label=""
+                value={orderIdInput}
+                onChange={setOrderIdInput}z
+                clearButton
+                onClearButtonClick={() => {
+                  setOrderIdInput("");
+                  navigate("/"); // limpa busca e volta para página 1
+                }}
+                placeholder="Buscar por Order ID"
+                type="number"
+                style={{ flex: 1 }} // para o input ocupar o máximo possível
+              />
+              <Button onClick={handleSearchSubmit} primary>
+                Buscar
+              </Button>
+            </div>
+
+            <IndexTable
+              resourceName={resourceName}
+              itemCount={logs.length}
+              selectedItemsCount={allResourcesSelected ? "All" : selectedResources.length}
+              onSelectionChange={handleSelectionChange}
+              headings={[
+                { title: "Pedido Shopify" },
+                { title: "Status financeiro" },
+                { title: "Descrição" },
+                { title: "Data da Operação" },
+              ]}
+            >
+              {logs.map((log, index) => (
+                <IndexTable.Row
+                  id={log.id}
+                  key={log.id}
+                  selected={selectedResources.includes(log.id)}
+                  position={index}
+                >
+                  <IndexTable.Cell>{log.orderId}</IndexTable.Cell>
+                  <IndexTable.Cell>
+                    <Badge
+                      status={
+                        log.financialStatus === "expired" || log.financialStatus === "pending"
+                          ? "critical"
+                          : "success"
+                      }
                     >
-                      App Bridge
-                    </Link>{" "}
-                    interface examples like an{" "}
-                    <Link url="/app/additional" removeUnderline>
-                      additional page in the app nav
-                    </Link>
-                    , as well as an{" "}
-                    <Link
-                      url="https://shopify.dev/docs/api/admin-graphql"
-                      target="_blank"
-                      removeUnderline
-                    >
-                      Admin GraphQL
-                    </Link>{" "}
-                    mutation demo, to provide a starting point for app
-                    development.
-                  </Text>
-                </BlockStack>
-                <BlockStack gap="200">
-                  <Text as="h3" variant="headingMd">
-                    Get started with products
-                  </Text>
-                  <Text as="p" variant="bodyMd">
-                    Generate a product with GraphQL and get the JSON output for
-                    that product. Learn more about the{" "}
-                    <Link
-                      url="https://shopify.dev/docs/api/admin-graphql/latest/mutations/productCreate"
-                      target="_blank"
-                      removeUnderline
-                    >
-                      productCreate
-                    </Link>{" "}
-                    mutation in our API references.
-                  </Text>
-                </BlockStack>
-                <InlineStack gap="300">
-                  <Button loading={isLoading} onClick={generateProduct}>
-                    Generate a product
-                  </Button>
-                  {fetcher.data?.product && (
-                    <Button
-                      url={`shopify:admin/products/${productId}`}
-                      target="_blank"
-                      variant="plain"
-                    >
-                      View product
-                    </Button>
-                  )}
-                </InlineStack>
-                {fetcher.data?.product && (
-                  <>
-                    <Text as="h3" variant="headingMd">
-                      {" "}
-                      productCreate mutation
-                    </Text>
-                    <Box
-                      padding="400"
-                      background="bg-surface-active"
-                      borderWidth="025"
-                      borderRadius="200"
-                      borderColor="border"
-                      overflowX="scroll"
-                    >
-                      <pre style={{ margin: 0 }}>
-                        <code>
-                          {JSON.stringify(fetcher.data.product, null, 2)}
-                        </code>
-                      </pre>
-                    </Box>
-                    <Text as="h3" variant="headingMd">
-                      {" "}
-                      productVariantsBulkUpdate mutation
-                    </Text>
-                    <Box
-                      padding="400"
-                      background="bg-surface-active"
-                      borderWidth="025"
-                      borderRadius="200"
-                      borderColor="border"
-                      overflowX="scroll"
-                    >
-                      <pre style={{ margin: 0 }}>
-                        <code>
-                          {JSON.stringify(fetcher.data.variant, null, 2)}
-                        </code>
-                      </pre>
-                    </Box>
-                  </>
-                )}
-              </BlockStack>
-            </Card>
-          </Layout.Section>
-          <Layout.Section variant="oneThird">
-            <BlockStack gap="500">
-              <Card>
-                <BlockStack gap="200">
-                  <Text as="h2" variant="headingMd">
-                    App template specs
-                  </Text>
-                  <BlockStack gap="200">
-                    <InlineStack align="space-between">
-                      <Text as="span" variant="bodyMd">
-                        Framework
-                      </Text>
-                      <Link
-                        url="https://remix.run"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        Remix
-                      </Link>
-                    </InlineStack>
-                    <InlineStack align="space-between">
-                      <Text as="span" variant="bodyMd">
-                        Database
-                      </Text>
-                      <Link
-                        url="https://www.prisma.io/"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        Prisma
-                      </Link>
-                    </InlineStack>
-                    <InlineStack align="space-between">
-                      <Text as="span" variant="bodyMd">
-                        Interface
-                      </Text>
-                      <span>
-                        <Link
-                          url="https://polaris.shopify.com"
-                          target="_blank"
-                          removeUnderline
-                        >
-                          Polaris
-                        </Link>
-                        {", "}
-                        <Link
-                          url="https://shopify.dev/docs/apps/tools/app-bridge"
-                          target="_blank"
-                          removeUnderline
-                        >
-                          App Bridge
-                        </Link>
-                      </span>
-                    </InlineStack>
-                    <InlineStack align="space-between">
-                      <Text as="span" variant="bodyMd">
-                        API
-                      </Text>
-                      <Link
-                        url="https://shopify.dev/docs/api/admin-graphql"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        GraphQL API
-                      </Link>
-                    </InlineStack>
-                  </BlockStack>
-                </BlockStack>
-              </Card>
-              <Card>
-                <BlockStack gap="200">
-                  <Text as="h2" variant="headingMd">
-                    Next steps
-                  </Text>
-                  <List>
-                    <List.Item>
-                      Build an{" "}
-                      <Link
-                        url="https://shopify.dev/docs/apps/getting-started/build-app-example"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        {" "}
-                        example app
-                      </Link>{" "}
-                      to get started
-                    </List.Item>
-                    <List.Item>
-                      Explore Shopify’s API with{" "}
-                      <Link
-                        url="https://shopify.dev/docs/apps/tools/graphiql-admin-api"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        GraphiQL
-                      </Link>
-                    </List.Item>
-                  </List>
-                </BlockStack>
-              </Card>
-            </BlockStack>
-          </Layout.Section>
-        </Layout>
-      </BlockStack>
+                      {log.financialStatus}
+                    </Badge>
+                  </IndexTable.Cell>
+                  <IndexTable.Cell>{log.descriptionOperation}</IndexTable.Cell>
+                  <IndexTable.Cell>
+                    {new Date(log.createdAt).toLocaleString("pt-BR", {
+                      timeZone: "America/Sao_Paulo",
+                    })}
+                  </IndexTable.Cell>
+                </IndexTable.Row>
+              ))}
+            </IndexTable>
+
+            {/* Paginação */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, marginTop: 16 }}>
+            <Pagination
+              hasPrevious={page > 1}
+              onPrevious={() => handlePageChange(page - 1)}
+              hasNext={page * pageSize < totalCount}
+              onNext={() => handlePageChange(page + 1)}
+            />
+            <span style={{ fontWeight: "bold" }}>Página {page}</span>
+          </div>
+          </Card>
+        </Layout.Section>
+
+        {/* Rodapé */}
+        <Layout.Section>
+          <Card sectioned>
+            <div style={{ textAlign: "center", paddingTop: "8px" }}>
+              <Text variant="bodyMd" as="span">
+                Desenvolvido por{" "}
+                <a
+                  href="https://goflow.digital/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ textDecoration: "none", color: "#000" }}
+                >
+                  <img
+                    src="https://goflow.digital/wp-content/uploads/2024/07/logo-flow.svg"
+                    alt="Flow Digital"
+                    style={{ height: "50px", verticalAlign: "middle" }}
+                  />
+                </a>
+              </Text>
+            </div>
+          </Card>
+        </Layout.Section>
+      </Layout>
     </Page>
   );
 }
+

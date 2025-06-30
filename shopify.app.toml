@@ -3,7 +3,7 @@
 client_id = "51ae29758457cad8d47b5bf4caf80371"
 name = "flow-bling-helper"
 handle = "flow-bling-helper-1"
-application_url = "https://flow-bling-helper.fly.dev"
+application_url = "https://deviant-essence-atlas-symbols.trycloudflare.com"
 embedded = true
 
 [build]
@@ -30,7 +30,17 @@ api_version = "2025-04"
 scopes = "read_customers,read_orders,read_products,write_customers,write_orders,write_products"
 
 [auth]
-redirect_urls = ["https://flow-bling-helper.fly.dev/auth/callback", "https://flow-bling-helper.fly.dev/auth/shopify/callback", "https://flow-bling-helper.fly.dev/api/auth/callback"]
+redirect_urls = ["https://deviant-essence-atlas-symbols.trycloudflare.com/auth/callback", "https://deviant-essence-atlas-symbols.trycloudflare.com/auth/shopify/callback", "https://deviant-essence-atlas-symbols.trycloudflare.com/api/auth/callback"]
 
 [pos]
 embedded = false
+
+
+[[extensions]]
+name = "Order Metafield Tracking Code"
+handle = "order-metafield-tracking-code"
+type = "ui_extension"
+
+  [[extensions.targeting]]
+  module = "./src/BlockExtension.jsx"
+  target = "admin.order-details.block.render"

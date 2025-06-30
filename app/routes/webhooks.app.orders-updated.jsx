@@ -32,13 +32,12 @@ export const action = async ({ request }) => {
     // Calcular a diferença de tempo em horas
     const timeDiffMs = currentDate - createdAt;
     const timeDiffHours = timeDiffMs / (1000 * 60 * 60); // Converte para horas
-    const isPixExpired = financialStatus === 'pending' && timeDiffHours > 24; // Expira após 24 horas
+    const isExpired = financialStatus === 'pending' && timeDiffHours > 24; // Expira após 24 horas
 
     console.log(`orderId: ${orderId}`);
     console.log(`Criado em: ${createdAt.toISOString()}`);
     console.log(`Tempo decorrido (horas): ${timeDiffHours.toFixed(2)}`);
     console.log(`Status financeiro: ${financialStatus}`);
-    console.log(`PIX expirado: ${isPixExpired}`);
 
     // --- Chamada Bling ---
     const createdDateRaw = order.created_at.split("T")[0];
@@ -60,7 +59,7 @@ export const action = async ({ request }) => {
         return new Response("Pedido não encontrado", { status: 404 });
       }
     // Cancela pedido expirado
-    if (isPixExpired) {
+    if (isExpired) {
       try {
         const response = await cancelarPedido(shop, pedido.id);
         console.log("Pedido cancelado com sucesso:", response);
@@ -84,7 +83,7 @@ export const action = async ({ request }) => {
       console.error("Erro ao adicionar OBSERVAÇÃO no pedido:", err);
     }
 
-    const descriptionOperation = isPixExpired
+    const descriptionOperation = isExpired
       ? "Pedido cancelado automaticamente por expiração do PIX"
       : "Observação atualizada manualmente";
 

@@ -1,0 +1,11 @@
+{
+  "name": "Order Metafield Tracking Code",
+  "description": "Allows editing the Bling tracking code on orders",
+    "orderTrackingCode.label": "Código de rastreio",
+      "orderTrackingCode.title": "Código de rastreio",
+        "orderTrackingCode.saveButton": "Atualizar"
+
+
+
+  
+}

@@ -22,7 +22,6 @@ export async function loader({ request }) {
     body: JSON.stringify({
       grant_type: "authorization_code",
       code,
-      redirect_uri: process.env.BLING_CALLBACK_URL,
     }),
   });
 
@@ -36,8 +35,8 @@ export async function loader({ request }) {
   }
 
   // Suponha que você tenha o shop no contexto ou sessão
-  const shop = "woodbullloja.myshopify.com";
-
+  // const shop = "woodbullloja.myshopify.com";
+  const shop = process.env.SHOPIFY_SHOP;
   await saveBlingToken({
     shop,
     accessToken: tokenData.access_token,
