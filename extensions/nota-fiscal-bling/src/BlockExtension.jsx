@@ -41,7 +41,7 @@ function NotaFiscalBlock() {
         }
       } catch (e) {
         console.error("Erro ao buscar nota fiscal:", e);
-        setError("Erro ao carregar link da nota fiscal.");
+        setError("Nota fiscal não encontrada.");
       }
     })();
   }, [orderId]);

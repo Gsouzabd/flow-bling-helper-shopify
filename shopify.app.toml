@@ -36,6 +36,9 @@ redirect_urls = ["https://flow-bling-helper.fly.dev/auth/callback", "https://flo
 embedded = false
 
 
+[capabilities]
+network_access = true
+
 [[extensions]]
 name = "Order Metafield Tracking Code"
 handle = "order-metafield-tracking-code"
@@ -55,6 +58,9 @@ type = "ui_extension"
 name = "Nota Fiscal Customer Account"
 handle = "nota-fiscal-customer-account"
 type = "ui_extension"
+
+  network_access = true
+
 
   [[extensions.targeting]]
   module = "./src/Checkout.jsx"

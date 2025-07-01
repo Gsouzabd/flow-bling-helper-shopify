@@ -17,7 +17,6 @@ network_access = true
 namespace = "tracking"
 key = "link_nota_fiscal_bling"
 
-# ✅ Corrigido: allowed_external_urls na raiz do TOML
 allowed_external_urls = [
   "https://flow-bling-helper.fly.dev",
   "https://www.bling.com.br"

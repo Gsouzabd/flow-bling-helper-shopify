@@ -15,6 +15,10 @@ export const action = async ({ request }) => {
     if (!orderIdShopify) {
       return json({ error: "Missing orderIdShopify" }, { status: 400 });
     }
+        console.log('orderIdShopify',orderIdShopify)
+
+
+
     // const orderIdShopify = 6498155462945 // ---> Mock de desenvolvimento
     const shop = process.env.SHOPIFY_SHOP;
 
@@ -47,7 +51,24 @@ export const action = async ({ request }) => {
     }
       // Cria o cliente GraphQL usando a sessão válida
     const client = new shopify.clients.Graphql({ session });
+    const orderRest = await fetch(
+      `https://${shop}/admin/api/2025-07/orders/${orderIdShopify}.json`,
+      {
+        method: "GET",
+        headers: {
+          "X-Shopify-Access-Token": session.accessToken,
+          "Content-Type": "application/json",
+        },
+      }
+    );
 
+    const orderJson = await orderRest.json();
+    const orderGID = orderJson.order?.admin_graphql_api_id;
+
+    if (!orderGID) {
+      console.error("❌ Não foi possível obter o GID do pedido:", orderJson);
+      return json({ error: "Pedido não encontrado ou GID ausente" }, { status: 404 });
+    }
     let mutation;
     let variables = {
       metafields: [],
