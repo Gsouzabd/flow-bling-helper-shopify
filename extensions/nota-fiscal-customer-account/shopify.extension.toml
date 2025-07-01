@@ -1,0 +1,24 @@
+api_version = "2025-04"
+
+[[extensions]]
+name = "nota-fiscal-customer-account"
+handle = "nota-fiscal-customer-account"
+type = "ui_extension"
+
+[[extensions.targeting]]
+module = "./src/CustomerAccount.jsx"
+target = "customer-account.order-status.block.render"
+
+[extensions.capabilities]
+api_access = true
+network_access = true
+
+[[extensions.metafields]]
+namespace = "tracking"
+key = "link_nota_fiscal_bling"
+
+# ✅ Corrigido: allowed_external_urls na raiz do TOML
+allowed_external_urls = [
+  "https://flow-bling-helper.fly.dev",
+  "https://www.bling.com.br"
+]

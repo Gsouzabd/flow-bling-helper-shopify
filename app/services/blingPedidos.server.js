@@ -28,7 +28,7 @@ export async function buscarPedidosPorData(shop, dataInicial, dataFinal) {
 }
 
 /**
- * Busca um pedido específico pelo `numeroLoja` (orderId da Shopify) dentro do intervalo de datas
+ * Busca todos os pedidos e filtra um pedido específico pelo `numeroLoja` (orderId da Shopify) dentro do intervalo de datas
  * @param {string} shop
  * @param {string} dataInicial - "YYYY-MM-DD"
  * @param {string} dataFinal - "YYYY-MM-DD"
@@ -56,7 +56,7 @@ export async function buscarIdPedido(shop, dataInicial, dataFinal, orderId) {
 
 
 /**
- * Busca um pedido específico pelo `numeroLoja` (orderId da Shopify) dentro do intervalo de datas
+ * Busca um pedido específico pelo (orderId da bling) dentro do intervalo de datas
  * @param {string} shop
  * @param {string|number} idPedido - ID da Bling 
  * @returns {Promise<object|null>}
@@ -139,4 +139,31 @@ export async function atualizarObservacaoPedido(shop, pedidoCompleto, novaObserv
   }
 
   return await res.json();
+}
+
+
+/**
+ * Busca uma nota fiscal específica no Bling pelo ID
+ * @param {string} shop - domínio/identificador da loja
+ * @param {string|number} idNotaFiscal - ID da nota fiscal no Bling
+ * @returns {Promise<object|null>} - dados da nota fiscal
+ */
+export async function buscarNotaFiscalPorId(shop, idNotaFiscal) {
+  const token = await getValidBlingToken(shop);
+
+  const url = `https://bling.com.br/Api/v3/nfe/${idNotaFiscal}`;
+
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Erro ao buscar nota fiscal: ${text}`);
+  }
+
+  const json = await res.json();
+  return json.data; // estrutura típica da API Bling
 }
