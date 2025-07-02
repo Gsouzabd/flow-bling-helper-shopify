@@ -1,13 +1,21 @@
 # Stage 1: build
 FROM node:18-alpine AS build
 
-RUN apk add --no-cache openssl
+# ✅ Adiciona compatibilidade com dependências nativas como rollup
+RUN apk add --no-cache openssl libc6-compat
 
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json ./
 
+# ✅ Instala as dependências de forma limpa
 RUN npm ci
+
+# ✅ Força a instalação dos binários nativos opcionais (bug fix)
+RUN npm rebuild
+
+# 🔧 Garante que o remix CLI funcione
+ENV PATH="./node_modules/.bin:$PATH"
 
 COPY . .
 
@@ -16,19 +24,17 @@ RUN npm run build
 # Stage 2: produção
 FROM node:18-alpine
 
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl libc6-compat
 
 WORKDIR /app
 
 ENV NODE_ENV=production
 
-COPY --from=build /app/package.json /app/package-lock.json* ./
+COPY --from=build /app/package.json /app/package-lock.json ./
 RUN npm ci --omit=dev
 
 COPY --from=build /app/build ./build
 COPY --from=build /app/node_modules ./node_modules
-
-# ✅ Adicione estas linhas
 COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/.env ./
 
