@@ -1,56 +1,86 @@
 import { json } from "@remix-run/node";
-import { sessionStorage } from "../shopify.server"; // ✅ usa a exportação correta
-import { shopify } from "../shopify.api"; // instância do SDK Shopify (criada com shopifyApi)
-import {buscarPedidoCompletoPorId, buscarNotaFiscalPorId } from "../services/blingPedidos.server";
+import { sessionStorage } from "../shopify.server";
+import { shopify } from "../shopify.api";
+import { buscarPedidoCompletoPorId, buscarNotaFiscalPorId } from "../services/blingPedidos.server";
 
 export const action = async ({ request }) => {
   try {
     const payload = await request.json();
     const idPedidoBling = payload?.data?.id;
-    if (!idPedidoBling) {
-      return json({ error: "Missing idPedidoBling" }, { status: 400 });
-    }
-    console.log('idPedidoBling',idPedidoBling)
     const orderIdShopify = payload?.data?.numeroLoja;
-    if (!orderIdShopify) {
-      return json({ error: "Missing orderIdShopify" }, { status: 400 });
+
+    if (!idPedidoBling || !orderIdShopify) {
+      return json({ error: "Parâmetros inválidos" }, { status: 400 });
     }
-        console.log('orderIdShopify',orderIdShopify)
 
-
-
-    // const orderIdShopify = 6498155462945 // ---> Mock de desenvolvimento
     const shop = process.env.SHOPIFY_SHOP;
-
-    const pedidoCompleto = await buscarPedidoCompletoPorId(shop, idPedidoBling);
-
-    //Buscando codigo rastreio ?
-    const codigosRastreio = pedidoCompleto.transporte?.volumes?.map(v => v.codigoRastreamento).filter(Boolean);
-    const codigoRastreio = codigosRastreio?.[0] || null;
-
-    //Buscando id nota fiscal
-    const idNotaFiscal = pedidoCompleto.notaFiscal?.id;
-
-
-    if(!codigoRastreio && !idNotaFiscal){
-      console.log("🧨 Nao há codigoRastreio ou idNota Fiscal:");
-      return json({ success: true, error: "Nao há codigoRastreio ou idNota Fiscal:"}, { status: 422 });
-    }
-
     const sessionId = `offline_${shop}`;
     const session = await sessionStorage.loadSession(sessionId);
 
-    if (!session) {
-      console.error("❌ Sessão não encontrada:", sessionId);
-      return json({ error: "Sessão não encontrada" }, { status: 403 });
+    if (!session || !session.accessToken) {
+      return json({ error: "Sessão inválida ou sem token" }, { status: 403 });
     }
 
-    if (!session.accessToken) {
-      console.error("❌ Sessão encontrada, mas sem accessToken:", session);
-      return json({ error: "Sessão sem token" }, { status: 403 });
-    }
-      // Cria o cliente GraphQL usando a sessão válida
+    const pedidoCompleto = await buscarPedidoCompletoPorId(shop, idPedidoBling);
+    const codigosRastreio = pedidoCompleto.transporte?.volumes?.map(v => v.codigoRastreamento).filter(Boolean);
+    const codigoRastreio = codigosRastreio?.[0] || null;
+
+    const idNotaFiscal = pedidoCompleto.notaFiscal?.id;
+
     const client = new shopify.clients.Graphql({ session });
+
+    // Adiciona Metafields (Tracking e NF)
+    const metafields = [];
+
+    if (codigoRastreio) {
+      metafields.push({
+        namespace: "tracking",
+        key: "codigo_de_rastreio_bling",
+        type: "single_line_text_field",
+        value: codigoRastreio,
+        ownerId: `gid://shopify/Order/${orderIdShopify}`,
+      });
+    }
+
+    if (idNotaFiscal) {
+      const notaFiscal = await buscarNotaFiscalPorId(shop, idNotaFiscal);
+      if (notaFiscal.linkPDF) {
+        metafields.push({
+          namespace: "tracking",
+          key: "link_nota_fiscal_bling",
+          type: "url",
+          value: notaFiscal.linkPDF,
+          ownerId: `gid://shopify/Order/${orderIdShopify}`,
+        });
+      }
+    }
+
+    if (metafields.length > 0) {
+      const mutation = `
+        mutation metafieldsSet($metafields: [MetafieldsSetInput!]!) {
+          metafieldsSet(metafields: $metafields) {
+            metafields { key namespace value }
+            userErrors { field message }
+          }
+        }
+      `;
+
+      const res = await client.query({
+        data: { query: mutation, variables: { metafields } },
+      });
+
+      if (res.body.data.metafieldsSet.userErrors.length) {
+        return json({ success: false, errors: res.body.data.metafieldsSet.userErrors }, { status: 400 });
+      }
+    }
+
+    // Criar fulfillment via REST (não GraphQL)
+    const locationsRes = await fetch(`https://${shop}/admin/api/2025-07/locations.json`, {
+      headers: { "X-Shopify-Access-Token": session.accessToken }
+    });
+    const locations = await locationsRes.json();
+    console.log(locations);
+    
     const orderRest = await fetch(
       `https://${shop}/admin/api/2025-07/orders/${orderIdShopify}.json`,
       {
@@ -63,88 +93,165 @@ export const action = async ({ request }) => {
     );
 
     const orderJson = await orderRest.json();
-    const orderGID = orderJson.order?.admin_graphql_api_id;
 
-    if (!orderGID) {
-      console.error("❌ Não foi possível obter o GID do pedido:", orderJson);
-      return json({ error: "Pedido não encontrado ou GID ausente" }, { status: 404 });
-    }
-    let mutation;
-    let variables = {
-      metafields: [],
-    };
+    let locationId = orderJson.order.location_id;
 
-    // 1. Adiciona código de rastreio, se existir
-    if (codigoRastreio) {
-      console.log("codigoRastreio: ", codigoRastreio);
-      variables.metafields.push({
-        namespace: "tracking",
-        key: "codigo_de_rastreio_bling",
-        type: "single_line_text_field",
-        value: codigoRastreio,
-        ownerId: `gid://shopify/Order/${orderIdShopify}`,
-      });
-    }
-
-    // 2. Adiciona link da nota fiscal, se existir
-    if (idNotaFiscal) {
-      const notaFiscal = await buscarNotaFiscalPorId(shop, idNotaFiscal);
-      const linkNotaFiscal = notaFiscal.linkPDF;
-
-      if (linkNotaFiscal) {
-        console.log("link nota fiscal: ", linkNotaFiscal);
-        variables.metafields.push({
-          namespace: "tracking",
-          key: "link_nota_fiscal_bling",
-          type: "url",
-          value: linkNotaFiscal,
-          ownerId: `gid://shopify/Order/${orderIdShopify}`,
-        });
-      }
-    }
-
-    // 3. Só executa se houver algo para salvar
-    if (variables.metafields.length > 0) {
-      mutation = `
-        mutation metafieldsSet($metafields: [MetafieldsSetInput!]!) {
-          metafieldsSet(metafields: $metafields) {
-            metafields {
-              key
-              namespace
-              value
-            }
-            userErrors {
-              field
-              message
-            }
-          }
+    const lineItems = orderJson.order.line_items.map(item => ({
+      id: item.id,
+      quantity: item.quantity, // quantity não pode ser 0
+    }));
+    
+    if (!locationId) {
+      const fulfillmentOrdersRes = await fetch(`https://${shop}/admin/api/2025-07/orders/${orderIdShopify}/fulfillment_orders.json`, {
+        method: "GET",
+        headers: {
+          "X-Shopify-Access-Token": session.accessToken,
+          "Content-Type": "application/json"
         }
-      `;
-
-      const response = await client.query({
-        data: { query: mutation, variables },
       });
-
-      const result = response.body?.data?.metafieldsSet;
-
-      if (!result) {
-        console.error("❌ Resposta inválida da API Shopify:", response.body);
-        return json({ error: "Resposta inválida da Shopify" }, { status: 500 });
+    
+      const fulfillmentOrdersJson = await fulfillmentOrdersRes.json();
+    
+      if (!fulfillmentOrdersRes.ok || !fulfillmentOrdersJson.fulfillment_orders.length) {
+        return json({ error: "Não foi possível obter fulfillment_orders" }, { status: 400 });
       }
-
-      if (result.userErrors?.length) {
-        console.error("🧨 Erros ao criar metafield:", result.userErrors);
-        return json({ success: false, errors: result.userErrors }, { status: 400 });
+    
+      const fulfillmentOrder = fulfillmentOrdersJson.fulfillment_orders[0];
+    
+      if (!fulfillmentOrder.assigned_location || !fulfillmentOrder.assigned_location.location || !fulfillmentOrder.assigned_location.location.id) {
+  
+        // Força usar o "Shop location" do locations.json
+        const shopLocation = locations.locations.find(loc => loc.name.toLowerCase() === 'shop location');
+        
+        if (!shopLocation) {
+          return json({ error: "Nenhuma location válida encontrada" }, { status: 400 });
+        }
+      
+        locationId = shopLocation.id; // Fallback para o Shop location
+      
+      } else {
+        // Usa a location atribuída normalmente
+        locationId = fulfillmentOrder.assigned_location.location.id;
       }
-
-      return json({ success: true, metafields: result.metafields });
     }
+      
+    
 
-    // 4. Se nada foi salvo
-    return json({ success: false, error: "Nenhum dado para salvar" }, { status: 204 });
+
+    if (codigoRastreio) {
+      let empresaRastreio = pedidoCompleto.transporte?.contato?.nome?.toLowerCase() || '';
+
+      const linksRastreio = {
+        correios: 'https://www.linkcorreios.com.br/?objeto=',
+        mandae: 'https://rastreae.com.br/resultado/'
+      };
+
+      // Função para identificar a transportadora
+      const identificarTransportadora = (nome) => {
+        if (!nome) return null;
+
+        if (nome.includes('correios')) return 'Correios';
+        if (nome.includes('mandae')) return 'Mandae';
+
+        return null; // fallback, caso não encontre correspondência
+      };
+
+      const transportadoraKey = identificarTransportadora(empresaRastreio);
+
+      let linkRastreamento = null;
+
+      if (transportadoraKey && codigoRastreio) {
+        linkRastreamento = linksRastreio[transportadoraKey];
+
+        // Monta o link completo dependendo da transportadora
+        if (transportadoraKey === 'Correios') {
+          linkRastreamento += codigoRastreio;
+        } else if (transportadoraKey === 'Mandae') {
+          linkRastreamento += codigoRastreio;
+        }
+      }
+
+      console.log({ empresaRastreio, linkRastreamento });
+
+
+      // Buscar fulfillment_orders
+      const fulfillmentOrdersRes = await fetch(`https://${shop}/admin/api/2025-07/orders/${orderIdShopify}/fulfillment_orders.json`, {
+        method: "GET",
+        headers: {
+          "X-Shopify-Access-Token": session.accessToken,
+          "Content-Type": "application/json"
+        }
+      });
+    
+      const fulfillmentOrdersJson = await fulfillmentOrdersRes.json();
+    
+      if (!fulfillmentOrdersRes.ok) {
+        throw new Error("Erro ao buscar fulfillment_orders");
+      }
+    
+      const fulfillmentOrder = fulfillmentOrdersJson.fulfillment_orders[0];
+    
+      const fulfillmentOrderId = fulfillmentOrder.id;
+      const fulfillmentOrderLineItems = fulfillmentOrder.line_items
+      .filter(item => item.fulfillable_quantity > 0)
+      .map(item => ({
+        id: item.id, // fulfillment_order_line_item id
+        quantity: item.fulfillable_quantity,
+      }));
+    
+    if (fulfillmentOrderLineItems.length === 0) {
+      return json({ error: "Nenhum item com quantidade para fulfillment" }, { status: 400 });
+    }
+      
+      
+      
+    
+      const fulfillmentPayload = {
+        fulfillment: {
+          message: "Pedido enviado via Bling",
+          notify_customer: false,
+          tracking_info: {
+            number: codigoRastreio,
+            company: 'Clique para acompanhar a entrega do seu pedido',
+            url: `${linksRastreio}${encodeURIComponent(codigoRastreio)}`
+          },
+          line_items_by_fulfillment_order: [
+            {
+              fulfillment_order_id: fulfillmentOrderId,
+              fulfillment_order_line_items: fulfillmentOrderLineItems
+            }
+          ]
+        }
+      };
+    
+      const fulfillmentRes = await fetch(`https://${shop}/admin/api/2025-07/fulfillments.json`, {
+        method: "POST",
+        headers: {
+          "X-Shopify-Access-Token": session.accessToken,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(fulfillmentPayload)
+      });
+    
+      const fulfillmentJson = await fulfillmentRes.json();
+    
+      if (!fulfillmentRes.ok) {
+        console.error("Erro ao criar fulfillment", fulfillmentJson);
+        throw new Error("Erro ao criar fulfillment");
+      }
+    
+      console.log("Fulfillment criado com sucesso", fulfillmentJson);
+    
+      return json({
+        success: true,
+        fulfillment: fulfillmentJson
+      });
+    }
+    
+
 
   } catch (error) {
-    console.error("❌ Erro ao processar webhook externo:", error);
-    return json({ error: "Internal server error" }, { status: 500 });
+    console.error("Erro geral:", error);
+    return json({ error: "Erro interno", message: error.message }, { status: 500 });
   }
 };

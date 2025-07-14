@@ -27,14 +27,17 @@ api_version = "2025-04"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_customers,read_orders,customer_read_orders,read_products,write_customers,write_orders,write_products"
+scopes = "read_locations,read_customers,read_orders,customer_read_orders,read_products,write_customers,write_orders,write_products,write_fulfillments,read_assigned_fulfillment_orders,write_merchant_managed_fulfillment_orders,write_third_party_fulfillment_orders,write_assigned_fulfillment_orders,read_merchant_managed_fulfillment_orders,read_third_party_fulfillment_orders,read_fulfillments,write_fulfillments"
 
 [auth]
-redirect_urls = ["https://flow-bling-helper.fly.dev/auth/callback", "https://flow-bling-helper.fly.dev/auth/shopify/callback", "https://flow-bling-helper.fly.dev/api/auth/callback"]
+redirect_urls = [
+  "https://flow-bling-helper.fly.dev/auth/callback",
+  "https://flow-bling-helper.fly.dev/auth/shopify/callback",
+  "https://flow-bling-helper.fly.dev/api/auth/callback"
+]
 
 [pos]
 embedded = false
-
 
 [capabilities]
 network_access = true
@@ -48,24 +51,18 @@ type = "ui_extension"
   module = "./src/BlockExtension.jsx"
   target = "admin.order-details.block.render"
 
-  [[extensions.metafields]]
-  namespace = "tracking"
-  key = "link_nota_fiscal_bling"
-
-
-
-[[extensions]]
-name = "Nota Fiscal Customer Account"
-handle = "nota-fiscal-customer-account"
-type = "ui_extension"
-
-  network_access = true
-
-
   [[extensions.targeting]]
   module = "./src/Checkout.jsx"
   target = "customer-account.order-status.block.render"
-  
+
+  [[extensions.metafields]]
+  namespace = "tracking"
+  key = "link_nota_fiscal_bling"
+  name = "Nota Fiscal Customer Account"
+  handle = "nota-fiscal-customer-account"
+  type = "ui_extension"
+  network_access = true
+
   [[extensions.metafields]]
   namespace = "tracking"
   key = "link_nota_fiscal_bling"
