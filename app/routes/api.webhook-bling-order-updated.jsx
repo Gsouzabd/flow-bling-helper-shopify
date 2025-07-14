@@ -142,8 +142,8 @@ export const action = async ({ request }) => {
       let empresaRastreio = pedidoCompleto.transporte?.contato?.nome?.toLowerCase() || '';
 
       const linksRastreio = {
-        correios: 'https://www.linkcorreios.com.br/?objeto=',
-        mandae: 'https://rastreae.com.br/resultado/'
+        Correios: 'https://www.linkcorreios.com.br/?objeto=',
+        Mandae: 'https://rastreae.com.br/resultado/'
       };
 
       // Função para identificar a transportadora
