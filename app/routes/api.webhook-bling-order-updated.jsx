@@ -213,7 +213,7 @@ export const action = async ({ request }) => {
           tracking_info: {
             number: codigoRastreio,
             company: 'Clique para acompanhar a entrega do seu pedido',
-            url: `${linksRastreio}${encodeURIComponent(codigoRastreio)}`
+            url: linkRastreamento
           },
           line_items_by_fulfillment_order: [
             {
