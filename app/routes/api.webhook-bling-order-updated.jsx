@@ -10,7 +10,7 @@ export const action = async ({ request }) => {
     const orderIdShopify = payload?.data?.numeroLoja;
 
     if (!idPedidoBling || !orderIdShopify) {
-      return json({ error: "Parâmetros inválidos" }, { status: 400 });
+      return json({ error: "Parâmetros inválidos" }, { status: 204 });
     }
 
     const shop = process.env.SHOPIFY_SHOP;
@@ -18,7 +18,7 @@ export const action = async ({ request }) => {
     const session = await sessionStorage.loadSession(sessionId);
 
     if (!session || !session.accessToken) {
-      return json({ error: "Sessão inválida ou sem token" }, { status: 403 });
+      return json({ error: "Sessão inválida ou sem token" }, { status: 204 });
     }
 
     const pedidoCompleto = await buscarPedidoCompletoPorId(shop, idPedidoBling);
@@ -70,7 +70,7 @@ export const action = async ({ request }) => {
       });
 
       if (res.body.data.metafieldsSet.userErrors.length) {
-        return json({ success: false, errors: res.body.data.metafieldsSet.userErrors }, { status: 400 });
+        return json({ success: false, errors: res.body.data.metafieldsSet.userErrors }, { status: 204 });
       }
     }
 
@@ -113,7 +113,7 @@ export const action = async ({ request }) => {
       const fulfillmentOrdersJson = await fulfillmentOrdersRes.json();
     
       if (!fulfillmentOrdersRes.ok || !fulfillmentOrdersJson.fulfillment_orders.length) {
-        return json({ error: "Não foi possível obter fulfillment_orders" }, { status: 400 });
+        return json({ error: "Não foi possível obter fulfillment_orders" }, { status: 204 });
       }
     
       const fulfillmentOrder = fulfillmentOrdersJson.fulfillment_orders[0];
@@ -124,7 +124,7 @@ export const action = async ({ request }) => {
         const shopLocation = locations.locations.find(loc => loc.name.toLowerCase() === 'shop location');
         
         if (!shopLocation) {
-          return json({ error: "Nenhuma location válida encontrada" }, { status: 400 });
+          return json({ error: "Nenhuma location válida encontrada" }, { status: 204 });
         }
       
         locationId = shopLocation.id; // Fallback para o Shop location
@@ -200,7 +200,7 @@ export const action = async ({ request }) => {
       }));
     
     if (fulfillmentOrderLineItems.length === 0) {
-      return json({ error: "Nenhum item com quantidade para fulfillment" }, { status: 400 });
+      return json({ error: "Nenhum item com quantidade para fulfillment" }, { status: 204 });
     }
       
       
