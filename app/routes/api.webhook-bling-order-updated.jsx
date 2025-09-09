@@ -7,10 +7,11 @@ export const action = async ({ request }) => {
   try {
     const payload = await request.json();
     const idPedidoBling = payload?.data?.id;
-    const orderIdShopify = payload?.data?.numeroLoja;
+    const orderIdShopify = payload?.data?.numeroLoja?.toString().trim();
 
     if (!idPedidoBling || !orderIdShopify) {
-      return json({ error: "Parâmetros inválidos" }, { status: 204 });
+      console.log("Parâmetros inválidos")
+      return json({ error: "Parâmetros inválidos" }, { status: 200 });
     }
 
     const shop = process.env.SHOPIFY_SHOP;
@@ -18,10 +19,17 @@ export const action = async ({ request }) => {
     const session = await sessionStorage.loadSession(sessionId);
 
     if (!session || !session.accessToken) {
-      return json({ error: "Sessão inválida ou sem token" }, { status: 204 });
+      console.log("Sessão inválida ou sem token")
+
+      return json({ error: "Sessão inválida ou sem token" }, { status: 200 });
     }
 
     const pedidoCompleto = await buscarPedidoCompletoPorId(shop, idPedidoBling);
+    const statusBling = pedidoCompleto.situacao?.id;
+    if(statusBling != 24 && statusBling != 9){
+      console.log("Não foi verificado ou atendido")
+      return json({ error: "Não foi verificado ou atendido" }, { status: 200 });
+    }
     const codigosRastreio = pedidoCompleto.transporte?.volumes?.map(v => v.codigoRastreamento).filter(Boolean);
     const codigoRastreio = codigosRastreio?.[0] || null;
 
@@ -70,7 +78,7 @@ export const action = async ({ request }) => {
       });
 
       if (res.body.data.metafieldsSet.userErrors.length) {
-        return json({ success: false, errors: res.body.data.metafieldsSet.userErrors }, { status: 204 });
+        return json({ success: false, errors: res.body.data.metafieldsSet.userErrors }, { status: 200 });
       }
     }
 
@@ -79,7 +87,7 @@ export const action = async ({ request }) => {
       headers: { "X-Shopify-Access-Token": session.accessToken }
     });
     const locations = await locationsRes.json();
-    console.log(locations);
+    console.log("Locations encontradas:", locations.locations?.map(loc => ({ id: loc.id, name: loc.name, active: loc.active })));
     
     const orderRest = await fetch(
       `https://${shop}/admin/api/2025-07/orders/${orderIdShopify}.json`,
@@ -113,25 +121,38 @@ export const action = async ({ request }) => {
       const fulfillmentOrdersJson = await fulfillmentOrdersRes.json();
     
       if (!fulfillmentOrdersRes.ok || !fulfillmentOrdersJson.fulfillment_orders.length) {
-        return json({ error: "Não foi possível obter fulfillment_orders" }, { status: 204 });
+        console.log("Não foi possível obter fulfillment_orders")
+        return json({ error: "Não foi possível obter fulfillment_orders" }, { status: 200 });
       }
     
       const fulfillmentOrder = fulfillmentOrdersJson.fulfillment_orders[0];
     
       if (!fulfillmentOrder.assigned_location || !fulfillmentOrder.assigned_location.location || !fulfillmentOrder.assigned_location.location.id) {
   
-        // Força usar o "Shop location" do locations.json
-        const shopLocation = locations.locations.find(loc => loc.name.toLowerCase() === 'shop location');
+        // Tenta encontrar uma localização válida com diferentes estratégias
+        let shopLocation = locations.locations.find(loc => 
+          loc.name.toLowerCase().includes('shop') || 
+          loc.name.toLowerCase().includes('main') ||
+          loc.name.toLowerCase().includes('principal')
+        );
+        
+        // Se não encontrar, usa a primeira localização disponível
+        if (!shopLocation && locations.locations.length > 0) {
+          shopLocation = locations.locations[0];
+        }
         
         if (!shopLocation) {
-          return json({ error: "Nenhuma location válida encontrada" }, { status: 204 });
+          console.log("Locations disponíveis:", locations.locations.map(loc => ({ id: loc.id, name: loc.name })));
+          return json({ error: "Nenhuma location válida encontrada" }, { status: 200 });
         }
       
-        locationId = shopLocation.id; // Fallback para o Shop location
+        locationId = shopLocation.id; // Fallback para uma localização válida
+        console.log(`Usando location de fallback: ${shopLocation.name} (ID: ${shopLocation.id})`);
       
       } else {
         // Usa a location atribuída normalmente
         locationId = fulfillmentOrder.assigned_location.location.id;
+        console.log(`Usando location atribuída: ${fulfillmentOrder.assigned_location.location.name} (ID: ${locationId})`);
       }
     }
       
@@ -200,7 +221,7 @@ export const action = async ({ request }) => {
       }));
     
     if (fulfillmentOrderLineItems.length === 0) {
-      return json({ error: "Nenhum item com quantidade para fulfillment" }, { status: 204 });
+      return json({ error: "Nenhum item com quantidade para fulfillment" }, { status: 200 });
     }
       
       
@@ -252,6 +273,6 @@ export const action = async ({ request }) => {
 
   } catch (error) {
     console.error("Erro geral:", error);
-    return json({ error: "Erro interno", message: error.message }, { status: 500 });
+    return json({ error: "Erro interno", message: error.message }, { status: 200 });
   }
 };
