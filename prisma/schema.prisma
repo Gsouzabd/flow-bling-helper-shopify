@@ -50,3 +50,26 @@ model OrderLog {
   descriptionOperation String?
   createdAt            DateTime @default(now()) // ✅ novo campo
 }
+
+// Fila persistente de webhooks (Bling e Shopify). Os endpoints apenas
+// enfileiram e respondem 2xx; um worker in-process processa com retry/backoff.
+model WebhookEvent {
+  id          String    @id @default(uuid())
+  source      String // 'bling' | 'shopify'
+  topic       String // ex: 'order-updated' | 'orders-updated'
+  shop        String
+  payload     Json
+  dedupeKey   String // source:topic:orderId — dedup feito na lógica de enqueue
+  status      String    @default("pending") // pending | processing | done | failed
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(8)
+  lastError   String?
+  nextRetryAt DateTime  @default(now())
+  lockedAt    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  processedAt DateTime?
+
+  @@index([status, nextRetryAt])
+  @@index([dedupeKey])
+}

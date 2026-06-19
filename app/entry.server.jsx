@@ -4,6 +4,10 @@ import { RemixServer } from "@remix-run/react";
 import { createReadableStreamFromReadable } from "@remix-run/node";
 import { isbot } from "isbot";
 import { addDocumentResponseHeaders } from "./shopify.server";
+import { startWebhookWorker } from "./services/webhookWorker.server";
+
+// Inicia o worker da fila de webhooks no boot do servidor (idempotente).
+startWebhookWorker();
 
 export const streamTimeout = 5000;
 
