@@ -10,7 +10,7 @@ import { getValidBlingToken } from "../../db/blingToken.server";
 export async function buscarPedidosPorData(shop, dataInicial, dataFinal) {
   const token = await getValidBlingToken(shop);
 
-  const url = `https://bling.com.br/Api/v3/pedidos/vendas?dataInicial=${dataInicial}&dataFinal=${dataFinal}`;
+  const url = `https://api.bling.com.br/Api/v3/pedidos/vendas?dataInicial=${dataInicial}&dataFinal=${dataFinal}`;
 
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
@@ -63,7 +63,7 @@ export async function buscarIdPedido(shop, dataInicial, dataFinal, orderId) {
  */
 export async function buscarPedidoCompletoPorId(shop, idPedido) {
   const token = await getValidBlingToken(shop);
-  const url = `https://bling.com.br/Api/v3/pedidos/vendas/${idPedido}`;
+  const url = `https://api.bling.com.br/Api/v3/pedidos/vendas/${idPedido}`;
 
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` }
@@ -89,7 +89,7 @@ export async function buscarPedidoCompletoPorId(shop, idPedido) {
 export async function cancelarPedido(shop, idPedidoVenda, idSituacao = 12) {
   const token = await getValidBlingToken(shop);
 
-  const url = `https://bling.com.br/Api/v3/pedidos/vendas/${idPedidoVenda}/situacoes/${idSituacao}`;
+  const url = `https://api.bling.com.br/Api/v3/pedidos/vendas/${idPedidoVenda}/situacoes/${idSituacao}`;
 
   const res = await fetch(url, {
     method: "PATCH",
@@ -124,7 +124,7 @@ export async function atualizarObservacaoPedido(shop, pedidoCompleto, novaObserv
   // Atualiza o campo observacoes concatenando o novo texto
   pedidoCompleto.observacoes = novaObservacao;
 
-  const res = await fetch(`https://bling.com.br/Api/v3/pedidos/vendas/${pedidoCompleto.id}`, {
+  const res = await fetch(`https://api.bling.com.br/Api/v3/pedidos/vendas/${pedidoCompleto.id}`, {
     method: "PUT",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -151,7 +151,7 @@ export async function atualizarObservacaoPedido(shop, pedidoCompleto, novaObserv
 export async function buscarNotaFiscalPorId(shop, idNotaFiscal) {
   const token = await getValidBlingToken(shop);
 
-  const url = `https://bling.com.br/Api/v3/nfe/${idNotaFiscal}`;
+  const url = `https://api.bling.com.br/Api/v3/nfe/${idNotaFiscal}`;
 
   const res = await fetch(url, {
     headers: {

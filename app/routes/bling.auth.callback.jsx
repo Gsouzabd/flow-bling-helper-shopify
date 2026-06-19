@@ -13,7 +13,7 @@ export async function loader({ request }) {
   const clientSecret = process.env.BLING_CLIENT_SECRET;
   const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
 
-  const tokenResponse = await fetch("https://www.bling.com.br/Api/v3/oauth/token", {
+  const tokenResponse = await fetch("https://api.bling.com.br/Api/v3/oauth/token", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
