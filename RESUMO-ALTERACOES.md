@@ -132,6 +132,63 @@ o sistema **reprocessou tudo sozinho**.
 
 ---
 
+## Segurança — Proteção dos dados no banco de dados
+
+### O que foi feito
+O banco de dados do app ficou por um tempo com as tabelas **abertas para acesso externo** —
+qualquer pessoa que soubesse a chave pública do projeto poderia, em tese, consultar ou alterar
+os dados diretamente, sem passar pelo app.
+
+### Por que isso era um risco
+As tabelas armazenam informações sensíveis: **tokens de acesso da Shopify e do Bling** (que são
+as "chaves" que permitem ao app agir em nome da loja), além de logs de pedidos e fila de
+processamento. Com o acesso aberto, esses dados ficavam expostos.
+
+### Como tratamos
+Ativamos o **controle de acesso por linha** (RLS — Row Level Security) em todas as tabelas.
+Com isso, o acesso externo direto às tabelas passa a ser bloqueado por padrão. O app em si
+continua funcionando normalmente, pois ele se conecta ao banco por um canal privilegiado que
+não é afetado por essa restrição.
+
+**Resultado:** os dados da integração estão protegidos e a superfície de exposição foi eliminada.
+
+---
+
+## Problema 4 — A Bling mudou o formato do sistema de acesso (autenticação JWT)
+
+**Data:** 25/06/2026
+
+### O que acontecia
+A Bling anunciou que o sistema antigo de "senha de acesso" (chamado tecnicamente de *token opaco*)
+está sendo descontinuado. A partir de um prazo ainda a ser definido, o sistema antigo será
+**bloqueado**, e qualquer app que ainda o use deixará de conseguir conversar com o Bling.
+
+### Por que acontecia
+É uma evolução interna da Bling: eles trocaram o formato da "chave de acesso" que o app usa para
+se identificar nas chamadas à API. O formato novo (chamado *JWT*) carrega mais informações dentro
+da própria chave, o que é mais seguro e eficiente para o sistema deles. Nossa integração não
+acompanhou essa mudança automaticamente — precisava ser ajustada.
+
+### Como tratamos
+Atualizamos o app para solicitar explicitamente o novo formato de chave ao Bling, tanto na
+primeira vez que o acesso é autorizado quanto nas renovações automáticas. Também garantimos que
+todas as chamadas feitas ao Bling já sinalizem que estão usando o novo formato.
+
+Após a atualização, foi necessário **re-autorizar o acesso** uma única vez — entrando na conta
+Bling da woodbull e confirmando a permissão novamente. A partir daí, o sistema passou a emitir e
+renovar chaves no novo formato automaticamente, sem necessidade de intervenção.
+
+**Resultado:** a integração está atualizada para o novo sistema de acesso da Bling e não corre
+risco de ser bloqueada quando o formato antigo for desativado definitivamente.
+
+### Como validamos
+- A nova chave de acesso ficou com tamanho muito maior que a antiga (de ~40 para ~950 caracteres),
+  confirmando que é o novo formato JWT.
+- O registro de operações no banco (logs) continuou crescendo normalmente após a troca, com
+  pedidos sendo atualizados no Bling sem erros de autenticação.
+
+---
+
 ## Em resumo
 
 | Problema | Causa | Solução |
@@ -139,6 +196,8 @@ o sistema **reprocessou tudo sozinho**.
 | Webhook do Bling era desativado | Processamento lento/com erros na resposta | Receber rápido e processar depois, via fila com tentativas automáticas |
 | "note_attributes" reaparecia | A limpeza desistia quando o fluxo falhava | Fila garante que a limpeza sempre acaba rodando |
 | Tudo falhou após publicar | Bling bloqueou o endereço antigo da API | Atualizado para o endereço oficial novo (api.bling.com.br) |
+| Dados do banco expostos externamente | Tabelas sem controle de acesso ativado | Ativado RLS em todas as tabelas — acesso externo bloqueado |
+| Sistema de acesso (token) descontinuado pelo Bling | Bling migrou para novo formato JWT | App atualizado para novo formato + re-autorização realizada |
 
 A integração ficou mais **confiável** (não perde pedidos), mais **resistente a falhas
 temporárias** (tenta de novo sozinha) e mais **transparente** (dá para acompanhar o estado de

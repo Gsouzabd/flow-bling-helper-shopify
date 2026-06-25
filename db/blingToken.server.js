@@ -25,13 +25,11 @@ export async function refreshBlingToken(shop) {
   const response = await fetch("https://api.bling.com.br/Api/v3/oauth/token", {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
+      "Content-Type": "application/x-www-form-urlencoded",
       Authorization: `Basic ${basicAuth}`,
+      "enable-jwt": "1",
     },
-    body: JSON.stringify({
-      grant_type: "refresh_token",
-      refresh_token: tokenData.refreshToken,
-    }),
+    body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: tokenData.refreshToken }).toString(),
   });
 
   if (!response.ok) {

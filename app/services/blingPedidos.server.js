@@ -13,7 +13,7 @@ export async function buscarPedidosPorData(shop, dataInicial, dataFinal) {
   const url = `https://api.bling.com.br/Api/v3/pedidos/vendas?dataInicial=${dataInicial}&dataFinal=${dataFinal}`;
 
   const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${token}`, "enable-jwt": "1" },
   });
 
   if (!res.ok) {
@@ -66,7 +66,7 @@ export async function buscarPedidoCompletoPorId(shop, idPedido) {
   const url = `https://api.bling.com.br/Api/v3/pedidos/vendas/${idPedido}`;
 
   const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` }
+    headers: { Authorization: `Bearer ${token}`, "enable-jwt": "1" }
   });
 
   if (!res.ok) {
@@ -96,6 +96,7 @@ export async function cancelarPedido(shop, idPedidoVenda, idSituacao = 12) {
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
+      "enable-jwt": "1",
     },
   });
 
@@ -129,6 +130,7 @@ export async function atualizarObservacaoPedido(shop, pedidoCompleto, novaObserv
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
+      "enable-jwt": "1",
     },
     body: JSON.stringify(pedidoCompleto),
   });
@@ -156,6 +158,7 @@ export async function buscarNotaFiscalPorId(shop, idNotaFiscal) {
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${token}`,
+      "enable-jwt": "1",
     },
   });
 

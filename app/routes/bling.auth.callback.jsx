@@ -16,13 +16,11 @@ export async function loader({ request }) {
   const tokenResponse = await fetch("https://api.bling.com.br/Api/v3/oauth/token", {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
+      "Content-Type": "application/x-www-form-urlencoded",
       "Authorization": `Basic ${basicAuth}`,
+      "enable-jwt": "1",
     },
-    body: JSON.stringify({
-      grant_type: "authorization_code",
-      code,
-    }),
+    body: new URLSearchParams({ grant_type: "authorization_code", code }).toString(),
   });
 
   const tokenData = await tokenResponse.json();
