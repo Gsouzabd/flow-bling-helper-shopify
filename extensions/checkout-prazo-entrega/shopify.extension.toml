@@ -1,0 +1,10 @@
+api_version = "2025-04"
+
+[[extensions]]
+name = "checkout-prazo-entrega"
+handle = "checkout-prazo-entrega"
+type = "ui_extension"
+
+  [[extensions.targeting]]
+  module = "./src/Checkout.jsx"
+  target = "purchase.checkout.shipping-option-list.render-after"

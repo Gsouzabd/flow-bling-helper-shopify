@@ -18,6 +18,10 @@ api_version = "2025-04"
   uri = "/webhooks/app/orders-updated"
 
   [[webhooks.subscriptions]]
+  topics = [ "orders/create" ]
+  uri = "/webhooks/app/orders-create"
+
+  [[webhooks.subscriptions]]
   topics = [ "app/scopes_update" ]
   uri = "/webhooks/app/scopes_update"
 

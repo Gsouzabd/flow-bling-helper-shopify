@@ -189,6 +189,55 @@ risco de ser bloqueada quando o formato antigo for desativado definitivamente.
 
 ---
 
+## Melhoria 1 — Prazo de entrega (dias úteis) agora aparece no e-mail e na página do pedido
+
+**Data:** 12/06/2026 (registrado em 12/08/2026)
+
+### O que motivou
+
+No checkout, a modalidade de frete escolhida pelo cliente já mostra o prazo em dias úteis (ex.:
+"Econômico - 16 dias úteis"), mas essa informação nunca era guardada em lugar nenhum. Por isso,
+ela desaparecia depois do checkout: não aparecia no e-mail de confirmação do pedido, nem na
+página "Meus Pedidos" que o cliente acessa depois.
+
+### Por que era assim
+
+O prazo em dias úteis só existe, hoje, dentro do nome da modalidade de frete escolhida no
+momento do checkout — não há, neste app, nenhum cálculo próprio de frete nem integração com
+serviço de transportadora. Como o app não capturava esse texto em nenhum momento, ele se
+perdia assim que o pedido era criado.
+
+Além disso, havia uma armadilha de tempo: o e-mail de confirmação do pedido é enviado pelo
+Shopify quase instantaneamente após o checkout — antes que qualquer aviso automático (webhook)
+do nosso app tivesse tempo de processar o pedido e gravar essa informação. Se a gente dependesse
+só de um webhook para isso, o prazo corria o risco de nunca aparecer no e-mail (só chegaria a
+tempo, às vezes, para a página do pedido).
+
+### Como tratamos
+
+Duas frentes, cada uma resolvendo uma parte do problema:
+
+1. **No próprio checkout**, foi adicionada uma extensão que lê a modalidade de frete escolhida
+   pelo cliente no exato momento da compra e grava o prazo (ex.: "16 dias úteis") diretamente no
+   pedido, como uma informação extra ("nota" do pedido). Como isso acontece durante o checkout,
+   antes mesmo do pedido existir, não há risco de o e-mail ser enviado antes da informação estar
+   pronta — o e-mail de confirmação da Shopify já consegue mostrar essa nota automaticamente.
+2. **Um novo aviso automático** (`orders/create`) foi configurado para, assim que um pedido é
+   criado, extrair o prazo do nome da modalidade de frete e salvá-lo também como um dado
+   permanente do pedido (metafield), no mesmo padrão já usado para código de rastreio e nota
+   fiscal. Essa é a informação que a página "Meus Pedidos" do cliente passou a exibir, num novo
+   bloco "Prazo Estimado" — mesmo padrão visual dos blocos que já existiam ali.
+
+O texto do e-mail de confirmação em si (Settings → Notifications, no admin da Shopify) precisa
+de um ajuste manual único, feito diretamente lá, para mostrar essa nota do pedido ao lado do
+aviso já existente de "até 2 dias úteis para envio" — isso não faz parte do código do app.
+
+**Resultado:** o cliente passa a ver o mesmo prazo em dias úteis que viu no checkout tanto no
+e-mail de confirmação quanto na página de status do pedido, sem depender de tempo de
+processamento de webhook nem de nenhuma integração externa nova.
+
+---
+
 ## Em resumo
 
 | Problema | Causa | Solução |
@@ -198,6 +247,7 @@ risco de ser bloqueada quando o formato antigo for desativado definitivamente.
 | Tudo falhou após publicar | Bling bloqueou o endereço antigo da API | Atualizado para o endereço oficial novo (api.bling.com.br) |
 | Dados do banco expostos externamente | Tabelas sem controle de acesso ativado | Ativado RLS em todas as tabelas — acesso externo bloqueado |
 | Sistema de acesso (token) descontinuado pelo Bling | Bling migrou para novo formato JWT | App atualizado para novo formato + re-autorização realizada |
+| Prazo de entrega sumia após o checkout | Não era capturado nem salvo em lugar nenhum | Note attribute gravado no checkout (e-mail) + metafield via webhook orders/create (página do pedido) |
 
 A integração ficou mais **confiável** (não perde pedidos), mais **resistente a falhas
 temporárias** (tenta de novo sozinha) e mais **transparente** (dá para acompanhar o estado de

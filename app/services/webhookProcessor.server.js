@@ -11,6 +11,71 @@ import { saveOrderLogWithRetry } from "../../db/orderLog.server";
 
 const SHOPIFY_REST_VERSION = "2025-07";
 
+const REGEX_DIAS_UTEIS = /(\d+)\s*dias?\s*uteis?/i;
+
+function removerAcentos(texto) {
+  return texto.normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
+
+/**
+ * Extrai o prazo de entrega (dias úteis) do título da linha de frete do
+ * pedido (ex.: "Econômico - 16 dias úteis") e grava como metafield da
+ * Order. Chamado de forma síncrona pelo webhook orders/create — não
+ * depende do Bling, então não precisa da fila de retry.
+ */
+export async function processShopifyOrderCreatedPrazoEntrega(shop, order) {
+  const orderIdShopify = order?.id?.toString().trim();
+  const shippingTitle = order?.shipping_lines?.[0]?.title;
+
+  if (!orderIdShopify || !shippingTitle) {
+    return { skipped: true, reason: "Pedido sem id ou sem shipping_lines" };
+  }
+
+  const match = removerAcentos(shippingTitle).match(REGEX_DIAS_UTEIS);
+  const prazoTexto = match ? `${match[1]} dias úteis` : shippingTitle;
+
+  const sessionId = `offline_${shop}`;
+  const session = await sessionStorage.loadSession(sessionId);
+  if (!session || !session.accessToken) {
+    return { skipped: true, reason: "Sessão inválida ou sem token" };
+  }
+
+  const client = new shopify.clients.Graphql({ session });
+
+  const mutation = `
+    mutation metafieldsSet($metafields: [MetafieldsSetInput!]!) {
+      metafieldsSet(metafields: $metafields) {
+        metafields { key namespace value }
+        userErrors { field message }
+      }
+    }
+  `;
+
+  const variables = {
+    metafields: [
+      {
+        namespace: "tracking",
+        key: "prazo_entrega_dias_uteis",
+        type: "single_line_text_field",
+        value: prazoTexto,
+        ownerId: `gid://shopify/Order/${orderIdShopify}`,
+      },
+    ],
+  };
+
+  const res = await client.query({ data: { query: mutation, variables } });
+
+  if (res.body.data.metafieldsSet.userErrors.length) {
+    return {
+      skipped: true,
+      reason: "Erro ao gravar metafield de prazo de entrega",
+      errors: res.body.data.metafieldsSet.userErrors,
+    };
+  }
+
+  return { ok: true, reason: "Metafield de prazo de entrega gravado" };
+}
+
 /**
  * Erro transitório: o evento deve ser reagendado (retry), não falhado.
  * Ex.: o pedido ainda não foi importado no Bling (timing).

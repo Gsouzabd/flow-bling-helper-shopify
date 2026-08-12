@@ -17,6 +17,10 @@ network_access = true
 namespace = "tracking"
 key = "link_nota_fiscal_bling"
 
+[[extensions.metafields]]
+namespace = "tracking"
+key = "prazo_entrega_dias_uteis"
+
 allowed_external_urls = [
   "https://flow-bling-helper.fly.dev",
   "https://www.bling.com.br"

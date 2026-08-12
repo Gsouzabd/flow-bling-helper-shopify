@@ -16,6 +16,7 @@ function NotaFiscal() {
   const order = useOrder();
   const [linkNotaFiscal, setLinkNotaFiscal] = useState(null);
   const [trackingCode, setTrackingCode] = useState(null);
+  const [prazoEntrega, setPrazoEntrega] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -56,6 +57,13 @@ function NotaFiscal() {
           setTrackingCode(tcJson.trackingCode);
         } else {
           console.warn("Resposta sem sucesso ou trackingCode:", tcJson);
+        }
+
+        // Buscar Prazo de Entrega
+        const peRes = await fetch(`${apiBase}/api/get-prazo-entrega?orderId=${orderId}`);
+        const peJson = await peRes.json();
+        if (peRes.ok && peJson.success && peJson.prazoEntrega) {
+          setPrazoEntrega(peJson.prazoEntrega);
         }
       } catch (error) {
         console.error("Erro ao buscar dados do pedido:", error);
@@ -107,8 +115,26 @@ function NotaFiscal() {
         >
           <BlockStack spacing="tight">
             <Text tone="subdued">
-              O seu pedido pode ser rastreado com o código: 
-              <Text tone="subdued" appearance="accent" emphasis> {trackingCode}</Text> 
+              O seu pedido pode ser rastreado com o código:
+              <Text tone="subdued" appearance="accent" emphasis> {trackingCode}</Text>
+            </Text>
+          </BlockStack>
+        </Banner>
+      )}
+
+      {prazoEntrega && (
+        <Banner
+          padding="base"
+          background="white"
+          border="base"
+          borderRadius="base"
+          title="⏱️ Prazo Estimado"
+          status="info"
+        >
+          <BlockStack spacing="tight">
+            <Text tone="subdued">
+              Prazo estimado de entrega:
+              <Text tone="subdued" appearance="accent" emphasis> {prazoEntrega}</Text>
             </Text>
           </BlockStack>
         </Banner>
