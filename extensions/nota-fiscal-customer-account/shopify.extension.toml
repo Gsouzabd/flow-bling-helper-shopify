@@ -1,8 +1,11 @@
-api_version = "2025-04"
+api_version = "2025-07"
 
 [[extensions]]
 name = "nota-fiscal-customer-account"
 handle = "nota-fiscal-customer-account"
+
+uid = "30ea73da-d1b2-95ae-3394-295924d90f3530c81b72"
+
 type = "ui_extension"
 
 [[extensions.targeting]]
