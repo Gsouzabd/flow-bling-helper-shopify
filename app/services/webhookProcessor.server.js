@@ -13,18 +13,65 @@ const SHOPIFY_REST_VERSION = "2025-07";
 
 const REGEX_DIAS_UTEIS = /(\d+)\s*dias?\s*uteis?/i;
 
+// Domínio da loja usado pelo widget de calculadora de frete (Kokfy) como
+// "origin" na chamada da API. A loja não é Shopify Plus, então checkout UI
+// extensions na etapa de frete não rodam — o prazo em dias úteis não fica
+// salvo em nenhum campo do pedido (shipping_lines[].title só tem o nome da
+// modalidade, ex.: "Sedex"). A alternativa viável é recalcular o mesmo frete
+// chamando a API pública que a calculadora de frete do site já usa.
+const KOKFY_STORE_DOMAIN = "woodbull.com.br";
+const KOKFY_API_URL = "https://calculo-frete-produto.kokfy.com/api/carrier/shopify";
+
 function removerAcentos(texto) {
   return texto.normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
 /**
+ * Recalcula o prazo de entrega chamando a mesma API pública que a
+ * calculadora de frete do site (Kokfy) usa, com os itens e o CEP do
+ * próprio pedido. Retorna o texto (ex.: "8 dias úteis") da opção cujo
+ * nome bate com a modalidade escolhida no pedido, ou null se não achar.
+ */
+async function buscarPrazoViaKokfy(shop, order, shippingTitle) {
+  const cep = order?.shipping_address?.zip?.replace(/\D/g, "");
+  if (!cep || !order?.line_items?.length) return null;
+
+  const items = order.line_items.map((li) => ({
+    id: li.variant_id,
+    variant_id: li.variant_id,
+    product_id: li.product_id,
+    quantity: li.quantity,
+    grams: li.grams,
+    price: Math.round(Number(li.price) * 100),
+    sku: li.sku,
+  }));
+
+  const res = await fetch(`${KOKFY_API_URL}?shop=${shop}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ items, cep, shop, origin: KOKFY_STORE_DOMAIN }),
+  });
+  if (!res.ok) return null;
+
+  const opcoes = await res.json();
+  if (!Array.isArray(opcoes) || !opcoes.length) return null;
+
+  const alvo = removerAcentos(shippingTitle || "").toLowerCase();
+  const opcao = opcoes.find((o) => {
+    const nome = removerAcentos(o.name || "").toLowerCase();
+    return nome.includes(alvo) || alvo.includes(nome);
+  });
+
+  return opcao?.shipping_date || null;
+}
+
+/**
  * Grava o prazo de entrega (dias úteis) como metafield da Order.
- * A fonte principal é o note attribute "Prazo de Entrega" gravado pela
- * extensão de checkout (a partir de selectedDeliveryOption.description) —
- * o shipping_lines[].title do pedido NÃO contém o prazo, só o nome da
- * modalidade (ex.: "Econômico"). Fallback: tenta extrair dias úteis do
- * título mesmo assim, para pedidos sem o note attribute (ex.: feitos
- * antes desta extensão existir, ou por outro canal como POS/draft order).
+ * Recalcula o prazo via API da calculadora de frete (Kokfy) usando os
+ * dados do próprio pedido. Fallback: tenta extrair dias úteis do título
+ * da modalidade de frete (shipping_lines[0].title) — que normalmente NÃO
+ * tem essa informação, mas serve como último recurso caso a chamada à
+ * Kokfy falhe ou não encontre a opção correspondente.
  * Chamado de forma síncrona pelo webhook orders/create — não depende do
  * Bling, então não precisa da fila de retry.
  */
@@ -34,16 +81,19 @@ export async function processShopifyOrderCreatedPrazoEntrega(shop, order) {
     return { skipped: true, reason: "Pedido sem id" };
   }
 
-  const noteAttr = order?.note_attributes?.find(
-    (attr) => attr.name === "Prazo de Entrega"
-  );
   const shippingTitle = order?.shipping_lines?.[0]?.title;
+  if (!shippingTitle) {
+    return { skipped: true, reason: "Pedido sem shipping_lines" };
+  }
 
-  let prazoTexto = noteAttr?.value;
+  let prazoTexto = null;
+  try {
+    prazoTexto = await buscarPrazoViaKokfy(shop, order, shippingTitle);
+  } catch (err) {
+    console.error("Erro ao consultar prazo via Kokfy:", err);
+  }
+
   if (!prazoTexto) {
-    if (!shippingTitle) {
-      return { skipped: true, reason: "Sem note attribute e sem shipping_lines" };
-    }
     const match = removerAcentos(shippingTitle).match(REGEX_DIAS_UTEIS);
     prazoTexto = match ? `${match[1]} dias úteis` : shippingTitle;
   }
