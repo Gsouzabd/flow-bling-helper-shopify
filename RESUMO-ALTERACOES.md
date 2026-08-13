@@ -229,15 +229,24 @@ durante o checkout:
 2. Essa informação passou a ser exibida num novo bloco "Prazo Estimado" na página "Meus
    Pedidos" do cliente — mesmo padrão visual dos blocos que já existiam ali (nota fiscal e
    rastreio).
-3. O e-mail de confirmação de pedido (Settings → Notifications, no admin da Shopify) precisa de
-   um ajuste manual único, feito diretamente lá, referenciando esse mesmo dado
-   (`{{ metafields.tracking.prazo_entrega_dias_uteis }}`) — isso não faz parte do código do app.
+3. **Descoberta durante os testes:** o e-mail de confirmação do pedido (o primeiro, disparado
+   pela Shopify assim que o cliente termina a compra) é enviado quase instantaneamente — antes
+   do nosso aviso automático (`orders/create`) terminar de consultar a calculadora de frete e
+   gravar o prazo. Colocar o prazo *nesse* e-mail específico corria o risco de ficar em branco
+   em parte dos pedidos, o que exigiria reenvio manual — inaceitável para o dia a dia.
+   Resolvemos usando, em vez disso, o e-mail de **confirmação de envio** (o que a Shopify manda
+   quando o pedido é marcado como processado/enviado): esse e-mail só sai bem depois da compra
+   — na prática, dias depois, quando o Bling confirma o pedido —, então o prazo sempre já está
+   pronto quando ele é enviado. Ajuste feito diretamente em Settings → Notifications no admin
+   da Shopify, referenciando o mesmo dado (`{{ metafields.tracking.prazo_entrega_dias_uteis }}`)
+   — isso não faz parte do código do app.
 
-**Resultado:** o cliente passa a ver o prazo em dias úteis tanto no e-mail de confirmação quanto
-na página de status do pedido, sem precisar de Shopify Plus. Limitação conhecida: como o valor é
-recalculado (não é mais a mesma cotação exata do instante do checkout), ele pode, raramente,
-diferir em 1 dia se a tarifa da transportadora mudar entre o checkout e o processamento do
-pedido — na prática, o mesmo valor na esmagadora maioria dos casos.
+**Resultado:** o cliente passa a ver o prazo em dias úteis tanto no e-mail de confirmação de
+envio quanto na página de status do pedido, sem precisar de Shopify Plus e sem nenhum trabalho
+manual de reenvio. Limitação conhecida: como o valor é recalculado (não é mais a mesma cotação
+exata do instante do checkout), ele pode, raramente, diferir em 1 dia se a tarifa da
+transportadora mudar entre o checkout e o processamento do pedido — na prática, o mesmo valor na
+esmagadora maioria dos casos.
 
 ---
 
