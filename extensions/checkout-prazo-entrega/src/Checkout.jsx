@@ -22,11 +22,16 @@ function PrazoEntrega() {
 
   useEffect(() => {
     const grupo = deliveryGroups?.find((g) => g.selectedDeliveryOption);
-    const titulo = grupo?.selectedDeliveryOption?.title;
-    if (!titulo) return;
+    const opcao = grupo?.selectedDeliveryOption;
+    if (!opcao) return;
 
-    const match = removerAcentos(titulo).match(REGEX_DIAS_UTEIS);
-    const prazoTexto = match ? `${match[1]} dias úteis` : titulo;
+    // O prazo em dias úteis vem em "description" (ex.: "11 dias úteis"),
+    // não em "title" (que é só o nome da modalidade, ex.: "Econômico").
+    const textoBase = opcao.description || opcao.title;
+    if (!textoBase) return;
+
+    const match = removerAcentos(textoBase).match(REGEX_DIAS_UTEIS);
+    const prazoTexto = match ? `${match[1]} dias úteis` : textoBase;
 
     applyAttributeChange({
       type: "updateAttribute",

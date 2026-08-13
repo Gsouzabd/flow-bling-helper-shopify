@@ -18,21 +18,35 @@ function removerAcentos(texto) {
 }
 
 /**
- * Extrai o prazo de entrega (dias úteis) do título da linha de frete do
- * pedido (ex.: "Econômico - 16 dias úteis") e grava como metafield da
- * Order. Chamado de forma síncrona pelo webhook orders/create — não
- * depende do Bling, então não precisa da fila de retry.
+ * Grava o prazo de entrega (dias úteis) como metafield da Order.
+ * A fonte principal é o note attribute "Prazo de Entrega" gravado pela
+ * extensão de checkout (a partir de selectedDeliveryOption.description) —
+ * o shipping_lines[].title do pedido NÃO contém o prazo, só o nome da
+ * modalidade (ex.: "Econômico"). Fallback: tenta extrair dias úteis do
+ * título mesmo assim, para pedidos sem o note attribute (ex.: feitos
+ * antes desta extensão existir, ou por outro canal como POS/draft order).
+ * Chamado de forma síncrona pelo webhook orders/create — não depende do
+ * Bling, então não precisa da fila de retry.
  */
 export async function processShopifyOrderCreatedPrazoEntrega(shop, order) {
   const orderIdShopify = order?.id?.toString().trim();
-  const shippingTitle = order?.shipping_lines?.[0]?.title;
-
-  if (!orderIdShopify || !shippingTitle) {
-    return { skipped: true, reason: "Pedido sem id ou sem shipping_lines" };
+  if (!orderIdShopify) {
+    return { skipped: true, reason: "Pedido sem id" };
   }
 
-  const match = removerAcentos(shippingTitle).match(REGEX_DIAS_UTEIS);
-  const prazoTexto = match ? `${match[1]} dias úteis` : shippingTitle;
+  const noteAttr = order?.note_attributes?.find(
+    (attr) => attr.name === "Prazo de Entrega"
+  );
+  const shippingTitle = order?.shipping_lines?.[0]?.title;
+
+  let prazoTexto = noteAttr?.value;
+  if (!prazoTexto) {
+    if (!shippingTitle) {
+      return { skipped: true, reason: "Sem note attribute e sem shipping_lines" };
+    }
+    const match = removerAcentos(shippingTitle).match(REGEX_DIAS_UTEIS);
+    prazoTexto = match ? `${match[1]} dias úteis` : shippingTitle;
+  }
 
   const sessionId = `offline_${shop}`;
   const session = await sessionStorage.loadSession(sessionId);
