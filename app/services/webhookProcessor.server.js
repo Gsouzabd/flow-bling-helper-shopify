@@ -94,9 +94,16 @@ export async function processShopifyOrderCreatedPrazoEntrega(shop, order) {
   }
 
   if (!prazoTexto) {
-    const match = removerAcentos(shippingTitle).match(REGEX_DIAS_UTEIS);
-    prazoTexto = match ? `${match[1]} dias úteis` : shippingTitle;
+    prazoTexto = shippingTitle;
   }
+
+  // Deixa explícito que a contagem começa na data da compra — sem isso,
+  // clientes interpretavam "X dias úteis" como a partir de hoje/da leitura
+  // do e-mail, e não a partir do momento em que o pedido foi feito.
+  const match = removerAcentos(prazoTexto).match(REGEX_DIAS_UTEIS);
+  prazoTexto = match
+    ? `${match[1]} dias úteis após a data da compra`
+    : prazoTexto;
 
   const sessionId = `offline_${shop}`;
   const session = await sessionStorage.loadSession(sessionId);
